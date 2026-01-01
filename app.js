@@ -1,1140 +1,757 @@
-const app = document.getElementById("app");
+const $ = (sel, root=document) => root.querySelector(sel);
 
-const STORE_KEY = "larped_users_v9";
-const SESSION_KEY = "larped_session_v9";
+const app = $("#app");
+const modalHost = $("#modalHost");
+const toastHost = $("#toastHost");
 
-// ---- Platforms shown in your Add Link modal style ----
 const PLATFORMS = [
-  { key:"twitch", name:"Twitch", icon:"🟣", type:"handle", prefix:"https://twitch.tv/" },
-  { key:"twitter", name:"Twitter", icon:"🐦", type:"handle", prefix:"https://twitter.com/" },
-  { key:"website", name:"Website", icon:"🌐", type:"url", prefix:"" },
-  { key:"x", name:"X", icon:"✖️", type:"handle", prefix:"https://x.com/" },
-  { key:"youtube", name:"YouTube", icon:"▶️", type:"url", prefix:"" },
-
-  { key:"cashapp", name:"CashApp", icon:"💵", type:"handle", prefix:"https://cash.app/$" },
-  { key:"deezer", name:"Deezer", icon:"🎶", type:"url", prefix:"" },
-  { key:"discord", name:"Discord", icon:"💬", type:"handle", prefix:"https://discord.com/users/" },
-  { key:"discord_server", name:"Discord Server", icon:"🧩", type:"url", prefix:"" },
-  { key:"email", name:"Email", icon:"✉️", type:"email", prefix:"mailto:" },
-
-  { key:"riot", name:"Riot Games", icon:"🟥", type:"handle", prefix:"" },
-  { key:"roblox", name:"Roblox", icon:"🧱", type:"handle", prefix:"https://www.roblox.com/users/" },
-  { key:"slat", name:"slat.cc", icon:"🟩", type:"url", prefix:"" },
-  { key:"snapchat", name:"Snapchat", icon:"👻", type:"handle", prefix:"https://snapchat.com/add/" },
+  { key:"twitter", name:"Twitter / X", icon:"X", prefix:"https://x.com/" },
+  { key:"discord", name:"Discord", icon:"💬", prefix:"https://discord.com/users/" },
+  { key:"youtube", name:"YouTube", icon:"▶", prefix:"https://youtube.com/@" },
+  { key:"tiktok", name:"TikTok", icon:"♪", prefix:"https://tiktok.com/@" },
+  { key:"instagram", name:"Instagram", icon:"◎", prefix:"https://instagram.com/" },
+  { key:"github", name:"GitHub", icon:"<>", prefix:"https://github.com/" },
+  { key:"website", name:"Website", icon:"🌐", prefix:"https://" },
+  { key:"email", name:"Email", icon:"✉", prefix:"mailto:" },
+  { key:"cashapp", name:"CashApp", icon:"$", prefix:"https://cash.app/$" },
 ];
 
-function safeUsername(raw){
-  const u = (raw||"").trim().toLowerCase();
-  if (!/^[a-z0-9._-]{2,20}$/.test(u)) return "";
-  return u;
+function toast(msg){
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.textContent = msg;
+  toastHost.appendChild(el);
+  setTimeout(()=>{ el.style.opacity="0"; el.style.transform="translateY(6px)"; }, 2200);
+  setTimeout(()=>{ el.remove(); }, 2800);
 }
-function loadUsers(){ try { return JSON.parse(localStorage.getItem(STORE_KEY)||"{}"); } catch { return {}; } }
-function saveUsers(users){ localStorage.setItem(STORE_KEY, JSON.stringify(users)); }
-function getSession(){ try { return JSON.parse(localStorage.getItem(SESSION_KEY)||"null"); } catch { return null; } }
-function setSession(s){ localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }
-function clearSession(){ localStorage.removeItem(SESSION_KEY); }
 
-function esc(s){ return String(s??"").replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
-function escAttr(s){ return String(s??"").replace(/"/g,"&quot;"); }
+function normalizeUsername(u){
+  return (u||"").trim().toLowerCase().replace(/[^a-z0-9_\.]/g,"");
+}
 
-function navTo(path){
+function readUsers(){
+  try { return JSON.parse(localStorage.getItem("larped_users") || "[]"); }
+  catch { return []; }
+}
+function writeUsers(users){
+  localStorage.setItem("larped_users", JSON.stringify(users));
+}
+function getSession(){
+  try { return JSON.parse(localStorage.getItem("larped_session") || "null"); }
+  catch { return null; }
+}
+function setSession(sess){
+  localStorage.setItem("larped_session", JSON.stringify(sess));
+}
+function clearSession(){
+  localStorage.removeItem("larped_session");
+}
+
+async function sha256(str){
+  const enc = new TextEncoder().encode(str);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+function currentUser(){
+  const sess = getSession();
+  if(!sess?.username) return null;
+  const users = readUsers();
+  return users.find(u => u.username === sess.username) || null;
+}
+
+function updateTopbar(){
+  const sess = getSession();
+  const logged = !!sess?.username;
+  $("#topLogin").style.display = logged ? "none":"inline-flex";
+  $("#topRegister").style.display = logged ? "none":"inline-flex";
+  $("#logoutBtn").style.display = logged ? "inline-flex":"none";
+}
+
+$("#logoutBtn").addEventListener("click", ()=>{
+  clearSession();
+  updateTopbar();
+  toast("Logged out.");
+  navigate("/");
+});
+
+function navigate(path){
   history.pushState({}, "", path);
-  render();
+  router();
 }
-window.addEventListener("popstate", render);
 
-// ---- Data model defaults ----
-function ensureUser(users, username){
-  if (!users[username]){
-    users[username] = {
-      username,
-      userId: String(Math.floor(100000 + Math.random()*900000)),
-      email: "",
-      password: "",
-      profile: {
-        displayName: username,
-        bio: "",
-        occupation: "",
-        location: "",
-        tags: [],
-        avatarDataUrl: "",
-        bgDataUrl: "",
-        bgColor: "#ffc7df"
-      },
-      appearance: {
-        accent: "#4f46e5",
-        radius: 18
-      },
-      links: []
-    };
+window.addEventListener("popstate", router);
+document.addEventListener("click", (e)=>{
+  const a = e.target.closest("a[data-link]");
+  if(!a) return;
+  e.preventDefault();
+  navigate(a.getAttribute("href"));
+});
+
+function routeMatch(path){
+  // dynamic username: "/something" that isn't known routes
+  const known = ["/", "/features", "/premium", "/discord", "/register", "/login", "/dashboard"];
+  if(known.includes(path)) return { name: path };
+  if(path.startsWith("/")) {
+    const u = path.slice(1);
+    if(u.length > 0) return { name: "/:username", username: u };
   }
-  // backfill new fields if old
-  const u = users[username];
-  u.profile ||= {};
-  u.appearance ||= {};
-  u.links ||= [];
-  if (!u.profile.bgColor) u.profile.bgColor = "#ffc7df";
-  if (!u.appearance.accent) u.appearance.accent = "#4f46e5";
-  if (!u.appearance.radius) u.appearance.radius = 18;
-  if (!u.userId) u.userId = String(Math.floor(100000 + Math.random()*900000));
-  return u;
+  return { name: path };
 }
 
-function topbar(){
-  const s = getSession();
-  return `
-    <header class="topbar">
-      <a class="brand" href="/" data-link>
-        <span class="brandDot"></span>
-        <span class="brandText">larped.lol</span>
-      </a>
-      <nav class="nav">
-        <a href="/#features" data-link>Features</a>
-        <a href="/#premium" data-link>Premium</a>
-        <a href="/#discord" data-link>Discord</a>
-      </nav>
-      <div class="navBtns">
-        ${s ? `<a class="btn ghost" href="/dashboard/overview" data-link>Dashboard</a>` : `<a class="btn ghost" href="/login" data-link>Login</a>`}
-        ${s ? `<button class="btn danger" id="logoutTop">Logout</button>` : `<a class="btn primary" href="/register" data-link>Register</a>`}
-      </div>
-    </header>
-  `;
+function render(html){
+  app.innerHTML = html;
 }
 
 function landing(){
-  return `
-    ${topbar()}
-    <div class="wrap center">
-      <div class="h1">
-        <span class="light">Your digital identity,</span><br/>
-        <span class="strong">simplified.</span>
-      </div>
+  render(`
+    <section class="hero">
+      <h1 class="h1"><span class="muted">Your digital identity,</span><br/>simplified.</h1>
       <p class="sub">
-        Create stunning bio links, showcase your content, and connect with your audience.
-        <b>larped.lol</b> gives you the tools to build your online presence — beautifully.
+        Build a premium link hub on <b>larped.lol</b>. Fast, clean, privacy-first, and designed like a luxury app.
       </p>
 
-      <div class="claimWrap">
-        <div class="claim">
-          <div class="claimPrefix">larped.lol/</div>
-          <input id="claimInput" placeholder="username" autocomplete="off" spellcheck="false" />
-          <button class="btn primary" id="claimBtn">Claim</button>
-        </div>
+      <div class="claimRow">
+        <div class="pillPrefix">larped.lol/</div>
+        <input class="claimInput" id="claimName" placeholder="username" autocomplete="off" />
+        <button class="btn solid" id="claimBtn">Claim</button>
       </div>
 
-      <div class="hr"></div>
-
-      <section id="features">
-        <div class="grid">
-          ${feature("🔗","Links","Add unlimited links with icons and sorting.")}
-          ${feature("🎨","Appearance","Accent colors, radius, backgrounds, effects.")}
-          ${feature("🧩","Widgets","Modular blocks (Phase 2).")}
-          ${feature("⚡","Live Preview","Real-time preview in dashboard.")}
-          ${feature("🛡️","Privacy","No ads or tracking.")}
-          ${feature("📦","Fast","Cloudflare Pages + CDN delivery.")}
-          ${feature("🧠","Secure Next","Phase 2 adds real auth + DB + rate limits.")}
-          ${feature("🌙","Aesthetic","Premium glass UI like your screenshots.")}
-        </div>
-      </section>
-
-      <div class="hr"></div>
-
-      <div class="footer">
-        <div class="footerInner">
-          <div>© ${new Date().getFullYear()} larped.lol</div>
-          <div>No ads • No trackers • Fast by design</div>
-        </div>
+      <div class="grid">
+        ${featureCard("Links","Connect all your important links in one place.","🔗")}
+        ${featureCard("Templates","Start fast with premium templates, then customize everything.","🧩")}
+        ${featureCard("Analytics","Privacy-first analytics (Phase 2 backend).","📊")}
+        ${featureCard("Layouts","Flexible sections, widgets, and modular blocks (Phase 2).","▦")}
+        ${featureCard("Comments","Optional interactions with safety controls (Phase 2).","💬")}
+        ${featureCard("Appearance","Glass UI, theme color, gradients, and motion.","🎨")}
+        ${featureCard("Rich Text","Beautiful bio formatting and embeds (Phase 2).","📝")}
+        ${featureCard("Live Preview","Instant preview while editing (Phase 2 dashboard).","⚡")}
       </div>
+    </section>
+  `);
+
+  const claimName = $("#claimName");
+  const claimBtn = $("#claimBtn");
+
+  const go = ()=>{
+    const name = normalizeUsername(claimName.value);
+    if(!name) return toast("Pick a username first.");
+    const users = readUsers();
+    const exists = users.some(u=>u.username===name);
+    if(exists){
+      toast("Username exists. Log in to edit it.");
+      navigate("/login?u="+encodeURIComponent(name));
+    } else {
+      navigate("/register?u="+encodeURIComponent(name));
+    }
+  };
+
+  claimBtn.addEventListener("click", go);
+  claimName.addEventListener("keydown", (e)=>{ if(e.key==="Enter") go(); });
+}
+
+function featureCard(title, desc, icon){
+  return `
+    <div class="card">
+      <div class="badgeIcon">${icon}</div>
+      <h3>${title}</h3>
+      <p>${desc}</p>
     </div>
   `;
 }
-function feature(icon, title, desc){
-  return `<div class="card"><div class="icon">${icon}</div><h3>${esc(title)}</h3><p>${esc(desc)}</p></div>`;
+
+function pageShell(title, body, rightBtnHtml=""){
+  return `
+    <div class="panel">
+      <div class="panelHeader">
+        <h2>${title}</h2>
+        <div class="row">${rightBtnHtml}</div>
+      </div>
+      <div class="panelBody">${body}</div>
+    </div>
+  `;
 }
 
-function registerPage(prefill){
-  const u = safeUsername(prefill||"");
-  return `
-    ${topbar()}
-    <section class="auth">
-      <div class="panel">
-        <div class="panelTop"><div class="miniDot"></div><div style="font-weight:900">larped.lol</div></div>
-        <h2>Register</h2>
-        <div class="muted">Create your account to claim your username.</div>
+function parseQuery(){
+  const q = {};
+  const s = new URLSearchParams(location.search);
+  for(const [k,v] of s.entries()) q[k]=v;
+  return q;
+}
 
-        <form class="form" id="regForm">
-          <div class="field">
-            <div class="label">Username</div>
-            <input class="input" name="username" placeholder="yourusername" value="${escAttr(u)}" />
-            <div class="note">Your page will be available at <b>larped.lol/username</b></div>
-          </div>
+function registerPage(){
+  const q = parseQuery();
+  const preU = normalizeUsername(q.u || "");
 
-          <div class="field">
-            <div class="label">Email address</div>
-            <input class="input" name="email" placeholder="example@email.com" />
-          </div>
-
-          <div class="field">
-            <div class="label">Password</div>
-            <input class="input" name="password" type="password" placeholder="Your password" />
-          </div>
-
-          <div class="note">Phase 1 prototype saves in your browser. Phase 2 adds real secure auth, CAPTCHA, database.</div>
-
-          <button class="btn primary full" type="submit">Register</button>
-          <div class="muted" style="margin-top:6px;">
-            Already have an account? <a class="smallLink" href="/login" data-link>Login</a>
-          </div>
-        </form>
+  render(pageShell("Register", `
+    <div class="formGrid">
+      <div class="field">
+        <div class="label">Username</div>
+        <input class="input" id="rUser" placeholder="username" value="${preU}" />
+        <div class="helper">Your page will be available at <b>larped.lol/username</b></div>
       </div>
-    </section>
-  `;
+
+      <div class="field">
+        <div class="label">Email (optional)</div>
+        <input class="input" id="rEmail" placeholder="you@example.com" />
+        <div class="helper">Phase 2 can add verification / password reset.</div>
+      </div>
+
+      <div class="field">
+        <div class="label">Password</div>
+        <input class="input" id="rPass" type="password" placeholder="••••••••" />
+      </div>
+
+      <div class="field">
+        <div class="label">Confirm Password</div>
+        <input class="input" id="rPass2" type="password" placeholder="••••••••" />
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <button class="btn solid" id="doRegister">Claim Now</button>
+      <a class="btn ghost" href="/login" data-link>Already have an account?</a>
+    </div>
+
+    <div class="helper" style="margin-top:10px">
+      Prototype note: this stores accounts in your browser (localStorage). We’ll upgrade to real secure accounts in Phase 2.
+    </div>
+  `));
+
+  $("#doRegister").addEventListener("click", async ()=>{
+    const username = normalizeUsername($("#rUser").value);
+    const email = ($("#rEmail").value||"").trim();
+    const pass = $("#rPass").value;
+    const pass2 = $("#rPass2").value;
+
+    if(username.length < 2) return toast("Username is too short.");
+    if(pass.length < 6) return toast("Password must be 6+ chars.");
+    if(pass !== pass2) return toast("Passwords don't match.");
+
+    const users = readUsers();
+    if(users.some(u=>u.username===username)) return toast("Username is taken.");
+
+    const passHash = await sha256(pass);
+
+    users.push({
+      id: Date.now(),
+      username,
+      email,
+      passHash,
+      createdAt: new Date().toISOString(),
+      profile: {
+        displayName: username,
+        bio: "",
+        accent: "#f7c400",
+        links: []
+      },
+      stats: { views: 0, clicks: 0 }
+    });
+
+    writeUsers(users);
+    setSession({ username });
+    updateTopbar();
+    toast("Account created.");
+    navigate("/dashboard");
+  });
 }
 
 function loginPage(){
-  return `
-    ${topbar()}
-    <section class="auth">
+  const q = parseQuery();
+  const preU = normalizeUsername(q.u || "");
+
+  render(pageShell("Login", `
+    <div class="formGrid">
+      <div class="field">
+        <div class="label">Username</div>
+        <input class="input" id="lUser" placeholder="username" value="${preU}" />
+      </div>
+
+      <div class="field">
+        <div class="label">Password</div>
+        <input class="input" id="lPass" type="password" placeholder="••••••••" />
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <button class="btn solid" id="doLogin">Login</button>
+      <a class="btn ghost" href="/register" data-link>Create account</a>
+    </div>
+
+    <div class="helper" style="margin-top:10px">
+      Phase 2: Google/Discord login + 2FA + real security on Workers/D1.
+    </div>
+  `));
+
+  $("#doLogin").addEventListener("click", async ()=>{
+    const username = normalizeUsername($("#lUser").value);
+    const pass = $("#lPass").value;
+
+    const users = readUsers();
+    const u = users.find(x=>x.username===username);
+    if(!u) return toast("No such user.");
+
+    const passHash = await sha256(pass);
+    if(passHash !== u.passHash) return toast("Wrong password.");
+
+    setSession({ username });
+    updateTopbar();
+    toast("Welcome back.");
+    navigate("/dashboard");
+  });
+}
+
+function dashboardPage(){
+  const me = currentUser();
+  if(!me){
+    toast("Please login first.");
+    return navigate("/login");
+  }
+
+  const section = (new URLSearchParams(location.search).get("s") || "overview");
+  const active = (k)=> section===k ? "sideLink active":"sideLink";
+
+  render(`
+    <div class="split">
+      <aside class="sidebar">
+        <div class="sideTitle">Dashboard</div>
+        <a class="${active("overview")}" href="/dashboard?s=overview" data-link>📌 Overview</a>
+
+        <div class="sideTitle">Customize</div>
+        <a class="${active("profile")}" href="/dashboard?s=profile" data-link>👤 Profile</a>
+        <a class="${active("links")}" href="/dashboard?s=links" data-link>🔗 Links</a>
+
+        <div class="sideTitle">Manage</div>
+        <a class="${active("settings")}" href="/dashboard?s=settings" data-link>⚙ Settings</a>
+
+        <div class="sideTitle">Quick</div>
+        <a class="sideLink" href="/${me.username}" data-link>↗ View Profile</a>
+      </aside>
+
+      <section>
+        ${dashboardSection(section, me)}
+      </section>
+    </div>
+  `);
+
+  // wire up section events
+  if(section==="profile") wireProfile(me);
+  if(section==="links") wireLinks(me);
+  if(section==="settings") wireSettings(me);
+}
+
+function dashboardSection(section, me){
+  if(section==="overview"){
+    const body = `
+      <div class="kpiGrid">
+        <div class="kpi"><div class="big">${me.stats?.views ?? 0}</div><div class="small">Profile Views</div></div>
+        <div class="kpi"><div class="big">${me.id}</div><div class="small">User ID</div></div>
+        <div class="kpi"><div class="big">${me.username}</div><div class="small">Username</div></div>
+      </div>
+
+      <div style="height:14px"></div>
+
       <div class="panel">
-        <div class="panelTop"><div class="miniDot"></div><div style="font-weight:900">larped.lol</div></div>
-        <h2>Sign in</h2>
-        <div class="muted">Welcome back. Enter your details.</div>
-
-        <form class="form" id="loginForm">
-          <div class="field">
-            <div class="label">Username or Email</div>
-            <input class="input" name="id" placeholder="your username or email" />
-          </div>
-
-          <div class="field">
-            <div class="label">Password</div>
-            <input class="input" name="password" type="password" placeholder="Your password" />
-          </div>
-
-          <button class="btn primary full" type="submit">Login</button>
-          <div class="muted" style="margin-top:6px;">
-            Don’t have an account? <a class="smallLink" href="/register" data-link>Sign up</a>
-          </div>
-        </form>
-      </div>
-    </section>
-  `;
-}
-
-/* ---------- DASHBOARD ---------- */
-function dashShell(activeRoute, activeTopTab, mainTitle, mainIcon, bodyHtml){
-  const s = getSession();
-  if (!s?.username){
-    navTo("/login");
-    return "";
-  }
-
-  const users = loadUsers();
-  const me = ensureUser(users, s.username);
-  saveUsers(users);
-
-  // apply appearance variables
-  const accent = me.appearance.accent || "#4f46e5";
-  const radius = me.appearance.radius || 18;
-
-  const sb = (href, icon, label) => `
-    <a class="sbItem ${activeRoute===href ? "active":""}" href="${href}" data-link>
-      <span class="sbIcon">${icon}</span><span>${label}</span>
-    </a>
-  `;
-
-  const tab = (href, label) => `
-    <a class="tab ${activeTopTab===href ? "active":""}" href="${href}" data-link>${label}</a>
-  `;
-
-  return `
-    <div style="--accent:${escAttr(accent)}; --r:${radius}px;">
-      <div class="dash">
-        <aside class="sidebar">
-          <div class="sbBrand">
-            <div class="dot"></div><div class="t">larped.lol</div>
-          </div>
-
-          <div class="sbGroup">
-            <div class="sbTitle">Dashboard</div>
-            ${sb("/dashboard/overview","📊","Overview")}
-          </div>
-
-          <div class="sbGroup">
-            <div class="sbTitle">Customize</div>
-            ${sb("/dashboard/profile","👤","Profile")}
-            ${sb("/dashboard/appearance","🎨","Appearance")}
-            ${sb("/dashboard/links","🔗","Links")}
-            ${sb("/dashboard/badges","🏷️","Badges")}
-            ${sb("/dashboard/widgets","🧩","Widgets")}
-            ${sb("/dashboard/tracks","🎵","Tracks")}
-          </div>
-
-          <div class="sbGroup">
-            <div class="sbTitle">Manage</div>
-            ${sb("/dashboard/settings","⚙️","Settings")}
-            ${sb("/dashboard/templates","🧱","Templates")}
-          </div>
-
-          <div class="sbBottom">
-            <a class="btn ghost full" href="/${encodeURIComponent(me.username)}" data-link>View Profile</a>
-            <div style="height:10px"></div>
-            <div class="userCard">
-              <div class="uAva">${esc((me.profile.displayName||me.username).slice(0,1).toUpperCase())}</div>
-              <div class="uMeta">
-                <div class="name">${esc(me.username)}</div>
-                <div class="id">UID ${esc(me.userId)}</div>
-              </div>
-              <div style="margin-left:auto">
-                <button class="btn danger small" id="logoutDash">Logout</button>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        <section class="main">
-          <div class="mainHead">
-            <div class="mainTitle"><span class="bubble">${mainIcon}</span><span>${esc(mainTitle)}</span></div>
-            <div class="row">
-              ${activeRoute==="/dashboard/links" ? `<button class="btn primary small" id="openAddLink">Add Link</button>` : ""}
-              ${activeRoute.startsWith("/dashboard/") ? `<a class="btn ghost small" href="/" data-link>Home</a>` : ""}
-            </div>
-          </div>
-
-          <div class="tabs">
-            ${tab("/dashboard/profile","Profile")}
-            ${tab("/dashboard/appearance","Appearance")}
-            ${tab("/dashboard/links","Links")}
-            ${tab("/dashboard/badges","Badges")}
-            ${tab("/dashboard/widgets","Widgets")}
-            ${tab("/dashboard/tracks","Tracks")}
-          </div>
-
-          <div class="mainBody">
-            ${bodyHtml}
-          </div>
-        </section>
-
-        ${previewPanel(me)}
-      </div>
-
-      ${modalHtml()}
-    </div>
-  `;
-}
-
-function previewPanel(me){
-  const p = me.profile;
-  const bgStyle = p.bgDataUrl
-    ? `background-image:url('${escAttr(p.bgDataUrl)}'); background-size:cover; background-position:center;`
-    : `background: linear-gradient(180deg, ${escAttr(p.bgColor||"#ffc7df")}, rgba(255,255,255,.45));`;
-
-  const accent = me.appearance.accent || "#4f46e5";
-  const radius = me.appearance.radius || 18;
-
-  const links = me.links.slice(0,5);
-  return `
-    <aside class="preview" style="--accent:${escAttr(accent)};">
-      <div class="previewHead">
-        <div class="pill">Minimal Profile Preview</div>
-        <div class="pill">Radius ${radius}px</div>
-      </div>
-      <div class="previewBody">
-        <div class="previewStage" style="border-radius:${Math.max(18, radius)}px;">
-          <div class="previewBg" style="${bgStyle}"></div>
-          <div class="previewCard" style="border-radius:${Math.max(16, radius)}px;">
-            <div class="previewAva" style="border-radius:${Math.max(16, radius)}px;">
-              ${p.avatarDataUrl ? `<img src="${escAttr(p.avatarDataUrl)}" alt="avatar">` : esc((p.displayName||me.username).slice(0,1).toUpperCase())}
-            </div>
-            <div class="previewName">${esc(p.displayName || me.username)}</div>
-            <div class="previewBio">${esc(p.bio || "")}</div>
-
-            <div class="previewLinks">
-              ${links.length ? links.map(l=>`
-                <a class="pLink" href="#" style="border-radius:${Math.max(14, radius)}px;">
-                  <span>${esc(l.icon||"🔗")} ${esc(l.title||"Link")}</span>
-                  <span style="color: rgba(0,0,0,.55); font-weight:900;">→</span>
-                </a>
-              `).join("") : `<div class="muted" style="font-size:12px;">No links yet</div>`}
-            </div>
-          </div>
-        </div>
-      </div>
-    </aside>
-  `;
-}
-
-function overviewPage(){
-  const s = getSession();
-  const users = loadUsers();
-  const me = ensureUser(users, s.username);
-
-  return dashShell(
-    "/dashboard/overview",
-    "/dashboard/profile",
-    "Overview",
-    "📊",
-    `
-      <div class="kpiRow">
-        <div class="kpi"><div class="ic">👁️</div><div><div class="val">0</div><div class="lbl">Profile Views</div></div></div>
-        <div class="kpi"><div class="ic">#</div><div><div class="val">${esc(me.userId)}</div><div class="lbl">User ID</div></div></div>
-        <div class="kpi"><div class="ic">👤</div><div><div class="val">${esc(me.username)}</div><div class="lbl">Username</div></div></div>
-      </div>
-
-      <div class="grid2">
-        <div class="bigCard">
-          <h3>Limited Badges</h3>
-          <div class="subt">You’ve claimed all available limited badges. Check back later!</div>
-          <div class="emptyBox" style="height:120px;">Badges Placeholder</div>
-        </div>
-
-        <div class="bigCard">
-          <h3>Quick Actions</h3>
-          <div class="subt">Connect / links / profile tools</div>
+        <div class="panelHeader"><h2>Quick Actions</h2></div>
+        <div class="panelBody">
           <div class="row">
-            <button class="btn primary full" id="goLinks">Add your first link</button>
-            <a class="btn ghost full" href="/dashboard/profile" data-link>Edit profile</a>
+            <a class="btn solid" href="/dashboard?s=links" data-link>+ Add Links</a>
+            <a class="btn ghost" href="/dashboard?s=profile" data-link>Edit Profile</a>
+            <a class="btn ghost" href="/${me.username}" data-link>View Public Page</a>
           </div>
-        </div>
-      </div>
-
-      <div class="split3">
-        <div class="bigCard">
-          <h3>Profile Visitors</h3>
-          <div class="subt">Last 30 days</div>
-          <div class="emptyBox">Analytics Placeholder</div>
-        </div>
-
-        <div class="bigCard">
-          <h3>Top 5 Links</h3>
-          <div class="subt">Clicks placeholder</div>
-          <div class="emptyBox">Top Links Placeholder</div>
-        </div>
-      </div>
-    `
-  );
-}
-
-function profilePage(){
-  return dashShell(
-    "/dashboard/profile",
-    "/dashboard/profile",
-    "Profile",
-    "👤",
-    `
-      <div class="block">
-        <h3>Avatar</h3>
-        <div class="row">
-          <input type="file" id="avatarFile" accept="image/*" style="display:none">
-          <button class="btn primary small" id="changeAvatar">Change Avatar</button>
-          <button class="btn ghost small" id="removeAvatar">Remove Avatar</button>
-        </div>
-      </div>
-
-      <div class="block">
-        <h3>Background</h3>
-        <div class="row">
-          <input type="file" id="bgFile" accept="image/*" style="display:none">
-          <button class="btn ghost small" id="bgColorBtn">Color</button>
-          <button class="btn ghost small" id="bgMediaBtn">Media</button>
-          <button class="btn primary small" id="changeBg">Change Image</button>
-          <button class="btn ghost small" id="removeBg">Remove Image</button>
-          <input class="input" type="color" id="bgColor" title="Background Color" style="width:48px; height:44px; padding:6px; border-radius:14px;">
-        </div>
-        <div class="muted" style="font-size:12px; margin-top:10px;">Pick an image or use a color background.</div>
-      </div>
-
-      <div class="block">
-        <h3>Profile Info</h3>
-        <div class="field">
-          <div class="label">Display Name</div>
-          <input class="input" id="displayName" placeholder="Display name">
-        </div>
-        <div class="field">
-          <div class="label">Bio</div>
-          <textarea class="textarea" id="bio" placeholder="Write your bio..."></textarea>
-        </div>
-        <div class="row" style="margin-top:10px;">
-          <div style="flex:1">
-            <div class="label">Occupation</div>
-            <input class="input" id="occupation" placeholder="">
+          <div class="helper" style="margin-top:10px">
+            This is Phase 1 (static prototype). Next we’ll add real database + uploads + analytics.
           </div>
-          <div style="flex:1">
-            <div class="label">Location</div>
-            <input class="input" id="location" placeholder="">
-          </div>
-        </div>
-
-        <div class="sep"></div>
-
-        <div class="row">
-          <button class="btn primary small" id="addTag">+ New Tag</button>
-          <div class="pills" id="tagPills"></div>
-        </div>
-
-        <div class="row" style="margin-top:12px;">
-          <button class="btn primary full" id="saveProfile">Save</button>
-        </div>
-      </div>
-    `
-  );
-}
-
-function appearancePage(){
-  return dashShell(
-    "/dashboard/appearance",
-    "/dashboard/appearance",
-    "Appearance",
-    "🎨",
-    `
-      <div class="block">
-        <h3>Colors</h3>
-        <div class="row">
-          <div style="flex:1">
-            <div class="label">Accent</div>
-            <input class="input" type="color" id="accentColor" style="height:44px; padding:6px;">
-          </div>
-          <div style="flex:1">
-            <div class="label">Radius</div>
-            <input class="input" type="range" id="radius" min="12" max="26">
-          </div>
-        </div>
-        <div class="row" style="margin-top:12px;">
-          <button class="btn primary full" id="saveAppearance">Save</button>
-        </div>
-      </div>
-    `
-  );
-}
-
-function linksPage(){
-  const s = getSession();
-  const users = loadUsers();
-  const me = ensureUser(users, s.username);
-
-  const list = me.links || [];
-
-  const body = list.length ? `
-    <div class="linksTop">
-      <div class="muted">Manage your links</div>
-      <div class="row">
-        <button class="btn ghost small" id="customizeLinks">Customize</button>
-        <button class="btn primary small" id="openAddLink">Add Link</button>
-      </div>
-    </div>
-    <div class="linkList">
-      ${list.map((l, idx)=>`
-        <div class="linkItem">
-          <div class="linkLeft">
-            <div class="linkIc">${esc(l.icon||"🔗")}</div>
-            <div class="linkMeta">
-              <div class="t">${esc(l.title||"Link")}</div>
-              <div class="u">${esc(l.url||"")}</div>
-            </div>
-          </div>
-          <div class="linkActions">
-            <button class="btn ghost small" data-moveup="${idx}">Up</button>
-            <button class="btn ghost small" data-movedown="${idx}">Down</button>
-            <button class="btn danger small" data-del="${idx}">Delete</button>
-          </div>
-        </div>
-      `).join("")}
-    </div>
-  ` : `
-    <div class="emptyBox" style="height:420px;">
-      <div style="text-align:center">
-        <div style="font-weight:950; color: rgba(255,255,255,.70);">No Links Found</div>
-        <div class="muted" style="margin-top:6px;">Create your first link to get started.</div>
-        <div style="margin-top:14px;">
-          <button class="btn primary" id="openAddLink">Add Link</button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  return dashShell(
-    "/dashboard/links",
-    "/dashboard/links",
-    "Links",
-    "🔗",
-    body
-  );
-}
-
-function placeholderPage(routeName){
-  return dashShell(
-    routeName,
-    "/dashboard/profile",
-    "Coming Soon",
-    "🧱",
-    `<div class="emptyBox" style="height:520px;">This section is next.</div>`
-  );
-}
-
-/* ---------- PUBLIC PROFILE PAGE ---------- */
-function publicProfile(username){
-  const u = safeUsername(username);
-  if (!u) {
-    return `${topbar()}<div class="wrap"><div class="card"><h3>Invalid username</h3><p>Use 2–20 chars: a-z 0-9 . _ -</p></div></div>`;
-  }
-
-  const users = loadUsers();
-  const me = users[u];
-
-  if (!me) {
-    return `
-      ${topbar()}
-      <div class="wrap">
-        <div class="card">
-          <h3>${esc(u)}</h3>
-          <p class="muted">This profile isn’t claimed yet.</p>
-          <a class="btn primary" href="/register?u=${encodeURIComponent(u)}" data-link>Claim username</a>
         </div>
       </div>
     `;
+    return pageShell("Overview", body);
   }
 
-  const p = me.profile || {};
-  const accent = me.appearance?.accent || "#4f46e5";
-  const radius = me.appearance?.radius || 18;
+  if(section==="profile"){
+    const body = `
+      <div class="formGrid">
+        <div class="field">
+          <div class="label">Display name</div>
+          <input class="input" id="pName" value="${escapeHtml(me.profile.displayName||me.username)}" />
+        </div>
 
-  const bgStyle = p.bgDataUrl
-    ? `background-image:url('${escAttr(p.bgDataUrl)}'); background-size:cover; background-position:center;`
-    : `background: linear-gradient(180deg, ${escAttr(p.bgColor||"#ffc7df")}, rgba(255,255,255,.45));`;
+        <div class="field">
+          <div class="label">Accent color</div>
+          <input class="input" id="pAccent" value="${escapeHtml(me.profile.accent||"#f7c400")}" />
+          <div class="helper">Default is yellow: <b>#f7c400</b></div>
+        </div>
 
-  return `
-    ${topbar()}
-    <div class="wrap" style="max-width:820px;">
-      <div class="card" style="overflow:hidden; padding:0; border-radius:${Math.max(18, radius)}px; border-color: rgba(255,255,255,.10);">
-        <div style="height:220px; ${bgStyle}"></div>
-        <div style="padding:16px;">
-          <div style="display:flex; gap:12px; align-items:center; margin-top:-48px;">
-            <div style="width:86px; height:86px; border-radius:${Math.max(18, radius)}px; background: rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.18); overflow:hidden; box-shadow: var(--shadow2); display:grid; place-items:center; font-weight:950;">
-              ${p.avatarDataUrl ? `<img src="${escAttr(p.avatarDataUrl)}" style="width:100%;height:100%;object-fit:cover;display:block;">` : esc((p.displayName||u).slice(0,1).toUpperCase())}
-            </div>
-            <div>
-              <div style="font-weight:950; font-size:22px;">${esc(p.displayName||u)}</div>
-              <div class="muted" style="font-size:13px;">${esc(p.occupation||"")} ${p.location ? "• "+esc(p.location) : ""}</div>
-            </div>
-          </div>
-
-          <div class="muted" style="margin-top:10px; white-space:pre-wrap;">${esc(p.bio||"")}</div>
-
-          <div style="margin-top:14px; display:grid; gap:10px;">
-            ${(me.links||[]).map(l=>`
-              <a class="btn ghost" href="${escAttr(l.url)}" target="_blank" rel="noopener noreferrer"
-                 style="justify-content:space-between; border-radius:${Math.max(14,radius)}px; border-color: rgba(255,255,255,.14);">
-                <span style="display:flex; gap:10px; align-items:center;">
-                  <span>${esc(l.icon||"🔗")}</span> <span>${esc(l.title||"Link")}</span>
-                </span>
-                <span style="color: rgba(255,255,255,.55); font-weight:950;">→</span>
-              </a>
-            `).join("") || `<div class="muted">No links yet.</div>`}
-          </div>
-
-          <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
-            ${(p.tags||[]).map(t=>`<span class="chip" style="cursor:default; background: rgba(79,70,229,.12); border-color: rgba(79,70,229,.22); color: rgba(255,255,255,.9);">${esc(t)}</span>`).join("")}
-          </div>
-
-          <div style="margin-top:16px; height:1px; background: rgba(255,255,255,.08);"></div>
-          <div class="muted" style="font-size:12px; margin-top:12px;">larped.lol</div>
+        <div class="field" style="grid-column:1/-1">
+          <div class="label">Bio</div>
+          <textarea class="textarea" id="pBio" placeholder="Write something...">${escapeHtml(me.profile.bio||"")}</textarea>
         </div>
       </div>
-    </div>
-  `;
-}
 
-/* ---------- MODALS ---------- */
-function modalHtml(){
-  return `
-    <div class="overlay" id="overlay">
-      <div class="modal" role="dialog" aria-modal="true">
-        <div class="modalHead">
-          <div class="ttl"><span>🔗</span> <span id="modalTitle">Add Link</span></div>
-          <button class="x" id="closeModal">✕</button>
+      <div class="row" style="margin-top:14px">
+        <button class="btn solid" id="saveProfile">Save</button>
+        <a class="btn ghost" href="/${me.username}" data-link>Preview Public</a>
+      </div>
+
+      <div class="helper" style="margin-top:10px">
+        Phase 2: avatar, banner, decorations, rich text editor, live preview panel.
+      </div>
+    `;
+    return pageShell("Profile", body);
+  }
+
+  if(section==="links"){
+    const list = (me.profile.links||[]).map((l,i)=>`
+      <div class="linkItem">
+        <div class="linkLeft">
+          <div class="linkIcon">${escapeHtml(l.icon||"🔗")}</div>
+          <div>
+            <div class="linkTitle">${escapeHtml(l.title||"Link")}</div>
+            <div class="mini">${escapeHtml(l.url||"")}</div>
+          </div>
         </div>
-        <div class="modalBody" id="modalBody"></div>
+        <div class="row">
+          <span class="pill">${l.enabled ? "Enabled":"Hidden"}</span>
+          <button class="btn ghost" data-del="${i}">Delete</button>
+        </div>
       </div>
-    </div>
-  `;
-}
+    `).join("") || `<div class="helper">No links yet. Hit <b>Add Link</b> to create your first.</div>`;
 
-function openModal(title, bodyHtml){
-  const ov = document.getElementById("overlay");
-  const mt = document.getElementById("modalTitle");
-  const mb = document.getElementById("modalBody");
-  if (!ov || !mt || !mb) return;
-  mt.textContent = title;
-  mb.innerHTML = bodyHtml;
-  ov.classList.add("show");
-
-  const x = document.getElementById("closeModal");
-  x?.addEventListener("click", closeModal);
-
-  ov.addEventListener("click", (e)=>{
-    if (e.target === ov) closeModal();
-  }, { once:true });
-}
-function closeModal(){
-  const ov = document.getElementById("overlay");
-  ov?.classList.remove("show");
-}
-
-function addLinkModal(){
-  return `
-    <div class="search">
-      <span style="opacity:.7;">🔍</span>
-      <input id="platSearch" placeholder="Search for a platform..." autocomplete="off">
-    </div>
-
-    <div class="platList" id="platList">
-      ${PLATFORMS.map(p=>platRow(p)).join("")}
-    </div>
-
-    <div style="margin-top:12px;">
-      <button class="btn primary full" id="customLinkBtn">➕ Or Create Custom Link</button>
-    </div>
-  `;
-}
-function platRow(p){
-  return `
-    <div class="plat" data-plat="${escAttr(p.key)}">
-      <div class="platL">
-        <div class="platIc">${esc(p.icon)}</div>
-        <div class="platName">${esc(p.name)}</div>
+    const body = `
+      <div class="row" style="justify-content:space-between">
+        <div class="helper">Manage your links (prototype).</div>
+        <button class="btn solid" id="addLinkBtn">+ Add Link</button>
       </div>
-      <div style="color: rgba(255,255,255,.45); font-weight:900;">›</div>
-    </div>
-  `;
-}
-
-function createLinkForm(platform){
-  const isCustom = !platform;
-  const p = platform || { key:"custom", name:"Custom Link", icon:"🔗", type:"url", prefix:"" };
-
-  const hint =
-    p.type === "handle" ? "Enter your username/handle"
-    : p.type === "email" ? "Enter your email"
-    : "Enter full URL";
-
-  return `
-    <div class="muted" style="margin-bottom:10px;">${esc(p.name)}</div>
-
-    <div class="field">
-      <div class="label">Title</div>
-      <input class="input" id="linkTitle" value="${escAttr(p.name)}">
-    </div>
-
-    <div class="field">
-      <div class="label">${esc(hint)}</div>
-      <input class="input" id="linkValue" placeholder="${p.type==="url" ? "https://example.com" : ""}">
-      <div class="note" style="margin-top:8px;">
-        ${p.type==="handle" ? `Will become: <b>${esc(p.prefix)}yourhandle</b>` : ""}
-        ${p.type==="email" ? `Will become: <b>mailto:you@email.com</b>` : ""}
-      </div>
-    </div>
-
-    <div class="row" style="margin-top:12px;">
-      <button class="btn primary full" id="saveLinkBtn">Save Link</button>
-    </div>
-  `;
-}
-
-/* ---------- WIRING ---------- */
-function wireGlobalLinks(){
-  document.querySelectorAll("[data-link]").forEach(a=>{
-    a.addEventListener("click", (e)=>{
-      const href = a.getAttribute("href");
-      if (!href) return;
-      if (href.startsWith("/#")) return; // allow hash
-      e.preventDefault();
-      navTo(href);
-    });
-  });
-}
-
-function wireLanding(){
-  const claimBtn = document.getElementById("claimBtn");
-  const claimInput = document.getElementById("claimInput");
-  if (claimBtn && claimInput){
-    const go = ()=>{
-      const u = safeUsername(claimInput.value);
-      if (!u){
-        claimInput.value = "";
-        claimInput.placeholder = "use 2-20 chars: a-z 0-9 . _ -";
-        claimInput.focus();
-        return;
-      }
-      navTo(`/register?u=${encodeURIComponent(u)}`);
-    };
-    claimBtn.addEventListener("click", go);
-    claimInput.addEventListener("keydown", (e)=>{ if (e.key==="Enter") go(); });
+      <div style="height:12px"></div>
+      <div class="linkList" id="linkList">${list}</div>
+    `;
+    return pageShell("Links", body);
   }
 
-  const logoutTop = document.getElementById("logoutTop");
-  logoutTop?.addEventListener("click", ()=>{
-    clearSession();
-    navTo("/");
-  });
-}
-
-function wireAuth(){
-  const regForm = document.getElementById("regForm");
-  if (regForm){
-    regForm.addEventListener("submit",(e)=>{
-      e.preventDefault();
-      const fd = new FormData(regForm);
-      const username = safeUsername(fd.get("username"));
-      const email = String(fd.get("email")||"").trim().toLowerCase();
-      const password = String(fd.get("password")||"");
-
-      if (!username) return alert("Invalid username. Use 2–20 chars: a-z 0-9 . _ -");
-      if (!email.includes("@")) return alert("Enter a valid email.");
-      if (password.length < 6) return alert("Password must be at least 6 chars.");
-
-      const users = loadUsers();
-      if (users[username]) return alert("That username is already claimed.");
-
-      const u = ensureUser(users, username);
-      u.email = email;
-      u.password = password;
-      u.profile.displayName = username;
-
-      saveUsers(users);
-      setSession({ username });
-      navTo("/dashboard/overview");
-    });
+  if(section==="settings"){
+    const body = `
+      <div class="helper">Prototype settings.</div>
+      <div style="height:12px"></div>
+      <div class="row">
+        <button class="btn ghost" id="wipeLocal">Reset ALL local accounts (dev)</button>
+        <button class="btn solid" id="logoutNow">Logout</button>
+      </div>
+    `;
+    return pageShell("Settings", body);
   }
 
-  const loginForm = document.getElementById("loginForm");
-  if (loginForm){
-    loginForm.addEventListener("submit",(e)=>{
-      e.preventDefault();
-      const fd = new FormData(loginForm);
-      const id = String(fd.get("id")||"").trim().toLowerCase();
-      const pw = String(fd.get("password")||"");
+  return pageShell("Dashboard", `<div class="helper">Unknown section.</div>`);
+}
 
-      const users = loadUsers();
-      let found = null;
-      for (const k of Object.keys(users)){
-        const u = users[k];
-        if (u.username === id || u.email === id){ found = u; break; }
-      }
-      if (!found) return alert("Account not found.");
-      if (found.password !== pw) return alert("Wrong password.");
-
-      setSession({ username: found.username });
-      navTo("/dashboard/overview");
-    });
+function saveUser(updated){
+  const users = readUsers();
+  const idx = users.findIndex(u=>u.username===updated.username);
+  if(idx>=0){
+    users[idx] = updated;
+    writeUsers(users);
   }
 }
 
-function wireDashCommon(){
-  const logoutDash = document.getElementById("logoutDash");
-  logoutDash?.addEventListener("click", ()=>{
-    clearSession();
-    navTo("/");
-  });
-
-  const goLinks = document.getElementById("goLinks");
-  goLinks?.addEventListener("click", ()=> navTo("/dashboard/links"));
-
-  const openAdd = document.getElementById("openAddLink");
-  openAdd?.addEventListener("click", ()=>{
-    openModal("Add Link", addLinkModal());
-    wireAddLinkModal();
-  });
-
-  // reorder / delete in links page
-  document.querySelectorAll("[data-del]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const idx = Number(btn.getAttribute("data-del"));
-      const s = getSession(); if (!s) return;
-      const users = loadUsers();
-      const me = ensureUser(users, s.username);
-      me.links.splice(idx, 1);
-      saveUsers(users);
-      render();
-    });
-  });
-  document.querySelectorAll("[data-moveup]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const idx = Number(btn.getAttribute("data-moveup"));
-      const s = getSession(); if (!s) return;
-      const users = loadUsers();
-      const me = ensureUser(users, s.username);
-      if (idx <= 0) return;
-      const t = me.links[idx-1];
-      me.links[idx-1] = me.links[idx];
-      me.links[idx] = t;
-      saveUsers(users);
-      render();
-    });
-  });
-  document.querySelectorAll("[data-movedown]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const idx = Number(btn.getAttribute("data-movedown"));
-      const s = getSession(); if (!s) return;
-      const users = loadUsers();
-      const me = ensureUser(users, s.username);
-      if (idx >= me.links.length-1) return;
-      const t = me.links[idx+1];
-      me.links[idx+1] = me.links[idx];
-      me.links[idx] = t;
-      saveUsers(users);
-      render();
-    });
+function wireProfile(me){
+  $("#saveProfile").addEventListener("click", ()=>{
+    me.profile.displayName = ($("#pName").value||"").trim().slice(0,40);
+    me.profile.bio = ($("#pBio").value||"").trim().slice(0,500);
+    const acc = ($("#pAccent").value||"").trim();
+    me.profile.accent = acc || "#f7c400";
+    saveUser(me);
+    toast("Saved.");
   });
 }
 
-function wireAddLinkModal(){
-  const search = document.getElementById("platSearch");
-  const list = document.getElementById("platList");
-  const customBtn = document.getElementById("customLinkBtn");
+function openModal(innerHtml){
+  modalHost.innerHTML = innerHtml;
+  modalHost.style.display = "grid";
+  modalHost.setAttribute("aria-hidden","false");
 
-  const renderList = (q)=>{
-    const qq = (q||"").trim().toLowerCase();
-    const filtered = !qq ? PLATFORMS : PLATFORMS.filter(p=>p.name.toLowerCase().includes(qq));
-    list.innerHTML = filtered.map(p=>platRow(p)).join("");
-    list.querySelectorAll("[data-plat]").forEach(row=>{
-      row.addEventListener("click", ()=>{
-        const key = row.getAttribute("data-plat");
-        const p = PLATFORMS.find(x=>x.key===key);
-        openModal("Add Link", createLinkForm(p));
-        wireCreateLink(p);
-      });
-    });
+  const close = ()=>{
+    modalHost.style.display = "none";
+    modalHost.setAttribute("aria-hidden","true");
+    modalHost.innerHTML = "";
   };
 
-  search?.addEventListener("input", ()=> renderList(search.value));
-  customBtn?.addEventListener("click", ()=>{
-    openModal("Add Link", createLinkForm(null));
-    wireCreateLink(null);
-  });
+  modalHost.addEventListener("click", (e)=>{
+    if(e.target === modalHost) close();
+  }, { once:true });
 
-  renderList("");
+  const x = modalHost.querySelector("[data-close]");
+  if(x) x.addEventListener("click", close);
+
+  return { close };
 }
 
-function wireCreateLink(platform){
-  const saveBtn = document.getElementById("saveLinkBtn");
-  saveBtn?.addEventListener("click", ()=>{
-    const title = String(document.getElementById("linkTitle")?.value || "").trim() || "Link";
-    const val = String(document.getElementById("linkValue")?.value || "").trim();
+function wireLinks(me){
+  const rerender = ()=> navigate("/dashboard?s=links");
 
-    if (!val) return alert("Enter a value.");
+  $("#addLinkBtn").addEventListener("click", ()=>{
+    const { close } = openModal(`
+      <div class="modal">
+        <div class="modalHeader">
+          <div class="title">Add Link</div>
+          <button class="x" data-close>×</button>
+        </div>
+        <div class="modalBody">
+          <input class="input" id="platSearch" placeholder="Search for a platform..." />
+          <div class="platformList" id="platList"></div>
+          <button class="btn solid footerBtn" id="customLink">+ Or Create Custom Link</button>
+        </div>
+      </div>
+    `);
 
-    let url = val;
+    const listEl = $("#platList");
+    const searchEl = $("#platSearch");
 
-    if (platform){
-      if (platform.type === "handle"){
-        const h = val.replace(/^@/,"").trim();
-        url = platform.prefix + encodeURIComponent(h);
-      } else if (platform.type === "email"){
-        url = "mailto:" + val;
-      } else if (platform.type === "url"){
-        url = val.startsWith("http") ? val : "https://" + val;
-      }
-    } else {
-      // custom
-      url = val.startsWith("http") ? val : "https://" + val;
-    }
+    const draw = (q="")=>{
+      const qq = q.trim().toLowerCase();
+      const items = PLATFORMS.filter(p => p.name.toLowerCase().includes(qq));
+      listEl.innerHTML = items.map(p=>`
+        <button class="platformBtn" data-plat="${p.key}">
+          <span class="linkIcon">${p.icon}</span>
+          <span>${p.name}</span>
+        </button>
+      `).join("");
+    };
 
-    const s = getSession(); if (!s) return;
-    const users = loadUsers();
-    const me = ensureUser(users, s.username);
+    draw();
 
-    me.links.push({
-      title,
-      url,
-      icon: platform?.icon || "🔗",
-      key: platform?.key || "custom"
-    });
+    searchEl.addEventListener("input", ()=> draw(searchEl.value));
 
-    saveUsers(users);
-    closeModal();
-    render();
-  });
-}
+    listEl.addEventListener("click", (e)=>{
+      const btn = e.target.closest("[data-plat]");
+      if(!btn) return;
+      const plat = PLATFORMS.find(p=>p.key===btn.dataset.plat);
+      if(!plat) return;
 
-function wireProfile(){
-  const s = getSession(); if (!s) return;
-  const users = loadUsers();
-  const me = ensureUser(users, s.username);
+      close();
 
-  // fill values
-  const dn = document.getElementById("displayName");
-  const bio = document.getElementById("bio");
-  const occ = document.getElementById("occupation");
-  const loc = document.getElementById("location");
-  const bgColor = document.getElementById("bgColor");
+      const { close: close2 } = openModal(`
+        <div class="modal">
+          <div class="modalHeader">
+            <div class="title">${plat.name}</div>
+            <button class="x" data-close>×</button>
+          </div>
+          <div class="modalBody">
+            <div class="field">
+              <div class="label">Value</div>
+              <input class="input" id="val" placeholder="${plat.prefix}" />
+              <div class="helper">We’ll build the URL automatically.</div>
+            </div>
+            <div class="row" style="margin-top:12px">
+              <button class="btn solid" id="save">Add</button>
+              <button class="btn ghost" data-close>Cancel</button>
+            </div>
+          </div>
+        </div>
+      `);
 
-  if (dn) dn.value = me.profile.displayName || "";
-  if (bio) bio.value = me.profile.bio || "";
-  if (occ) occ.value = me.profile.occupation || "";
-  if (loc) loc.value = me.profile.location || "";
-  if (bgColor) bgColor.value = me.profile.bgColor || "#ffc7df";
-
-  // tags
-  function renderTags(){
-    const wrap = document.getElementById("tagPills");
-    if (!wrap) return;
-    wrap.innerHTML = (me.profile.tags||[]).map((t,i)=>`
-      <span class="chip" data-tag="${i}">#${esc(t)} ✕</span>
-    `).join("");
-
-    wrap.querySelectorAll("[data-tag]").forEach(ch=>{
-      ch.addEventListener("click", ()=>{
-        const idx = Number(ch.getAttribute("data-tag"));
-        me.profile.tags.splice(idx,1);
-        saveUsers(users);
-        render();
+      $("#save").addEventListener("click", ()=>{
+        const v = ($("#val").value||"").trim();
+        if(!v) return toast("Enter a value.");
+        const url = plat.prefix + v.replace(/^https?:\/\//i,"");
+        me.profile.links = me.profile.links || [];
+        me.profile.links.push({
+          title: plat.name,
+          url,
+          icon: plat.icon,
+          enabled: true
+        });
+        saveUser(me);
+        toast("Link added.");
+        close2();
+        rerender();
       });
     });
-  }
-  renderTags();
 
-  document.getElementById("addTag")?.addEventListener("click", ()=>{
-    const t = prompt("New tag (no # needed):");
-    if (!t) return;
-    me.profile.tags.push(t.trim().slice(0,24));
-    saveUsers(users);
-    render();
+    $("#customLink").addEventListener("click", ()=>{
+      close();
+      const { close: close3 } = openModal(`
+        <div class="modal">
+          <div class="modalHeader">
+            <div class="title">Custom Link</div>
+            <button class="x" data-close>×</button>
+          </div>
+          <div class="modalBody">
+            <div class="field">
+              <div class="label">Title</div>
+              <input class="input" id="ctitle" placeholder="My link" />
+            </div>
+            <div class="field" style="margin-top:10px">
+              <div class="label">URL</div>
+              <input class="input" id="curl" placeholder="https://example.com" />
+            </div>
+            <div class="row" style="margin-top:12px">
+              <button class="btn solid" id="csave">Add</button>
+              <button class="btn ghost" data-close>Cancel</button>
+            </div>
+          </div>
+        </div>
+      `);
+
+      $("#csave").addEventListener("click", ()=>{
+        const title = ($("#ctitle").value||"").trim() || "Custom";
+        const url = ($("#curl").value||"").trim();
+        if(!/^https?:\/\//i.test(url) && !/^mailto:/i.test(url)) return toast("URL must start with http(s):// (or mailto:).");
+        me.profile.links = me.profile.links || [];
+        me.profile.links.push({ title, url, icon:"🔗", enabled:true });
+        saveUser(me);
+        toast("Link added.");
+        close3();
+        rerender();
+      });
+    });
   });
 
-  // avatar
-  const avatarFile = document.getElementById("avatarFile");
-  document.getElementById("changeAvatar")?.addEventListener("click", ()=> avatarFile?.click());
-  avatarFile?.addEventListener("change", ()=>{
-    const f = avatarFile.files?.[0];
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = ()=>{
-      me.profile.avatarDataUrl = String(r.result||"");
-      saveUsers(users);
-      render();
-    };
-    r.readAsDataURL(f);
-  });
-  document.getElementById("removeAvatar")?.addEventListener("click", ()=>{
-    me.profile.avatarDataUrl = "";
-    saveUsers(users);
-    render();
-  });
-
-  // background image
-  const bgFile = document.getElementById("bgFile");
-  document.getElementById("changeBg")?.addEventListener("click", ()=> bgFile?.click());
-  bgFile?.addEventListener("change", ()=>{
-    const f = bgFile.files?.[0];
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = ()=>{
-      me.profile.bgDataUrl = String(r.result||"");
-      saveUsers(users);
-      render();
-    };
-    r.readAsDataURL(f);
-  });
-  document.getElementById("removeBg")?.addEventListener("click", ()=>{
-    me.profile.bgDataUrl = "";
-    saveUsers(users);
-    render();
-  });
-
-  bgColor?.addEventListener("input", ()=>{
-    me.profile.bgColor = bgColor.value;
-    saveUsers(users);
-    // don’t full render on every tick—just update preview by re-rendering
-    render();
-  });
-
-  document.getElementById("saveProfile")?.addEventListener("click", ()=>{
-    me.profile.displayName = dn?.value?.trim() || me.username;
-    me.profile.bio = bio?.value || "";
-    me.profile.occupation = occ?.value || "";
-    me.profile.location = loc?.value || "";
-    if (bgColor?.value) me.profile.bgColor = bgColor.value;
-
-    saveUsers(users);
-    render();
+  $("#linkList").addEventListener("click", (e)=>{
+    const del = e.target.closest("[data-del]");
+    if(!del) return;
+    const idx = Number(del.dataset.del);
+    if(Number.isNaN(idx)) return;
+    me.profile.links.splice(idx,1);
+    saveUser(me);
+    toast("Deleted.");
+    rerender();
   });
 }
 
-function wireAppearance(){
-  const s = getSession(); if (!s) return;
-  const users = loadUsers();
-  const me = ensureUser(users, s.username);
-
-  const accent = document.getElementById("accentColor");
-  const radius = document.getElementById("radius");
-
-  if (accent) accent.value = me.appearance.accent || "#4f46e5";
-  if (radius) radius.value = String(me.appearance.radius || 18);
-
-  document.getElementById("saveAppearance")?.addEventListener("click", ()=>{
-    me.appearance.accent = accent?.value || "#4f46e5";
-    me.appearance.radius = Number(radius?.value || 18);
-    saveUsers(users);
-    render();
+function wireSettings(me){
+  $("#wipeLocal").addEventListener("click", ()=>{
+    localStorage.removeItem("larped_users");
+    localStorage.removeItem("larped_session");
+    updateTopbar();
+    toast("Local accounts wiped.");
+    navigate("/");
+  });
+  $("#logoutNow").addEventListener("click", ()=>{
+    clearSession();
+    updateTopbar();
+    toast("Logged out.");
+    navigate("/");
   });
 }
 
-/* ---------- ROUTER ---------- */
-function render(){
-  const url = new URL(location.href);
-  const path = decodeURIComponent(url.pathname);
+function publicProfile(username){
+  const u = normalizeUsername(username);
+  const users = readUsers();
+  const person = users.find(x=>x.username===u);
 
-  // Fix your old issue: if someone hits /profile, go dashboard profile if logged in
-  if (path === "/profile"){
-    const s = getSession();
-    if (s?.username) return navTo("/dashboard/profile");
-    return navTo("/login");
-  }
-
-  // Dashboard routes
-  if (path.startsWith("/dashboard")){
-    const seg = path.split("/").filter(Boolean)[1] || "overview";
-    let html = "";
-    if (seg === "overview") html = overviewPage();
-    else if (seg === "profile") html = profilePage();
-    else if (seg === "appearance") html = appearancePage();
-    else if (seg === "links") html = linksPage();
-    else html = placeholderPage(`/dashboard/${seg}`);
-
-    app.innerHTML = html;
-    wireGlobalLinks();
-    wireDashCommon();
-    if (seg === "profile") wireProfile();
-    if (seg === "appearance") wireAppearance();
+  if(!person){
+    render(pageShell("Not found", `
+      <div class="helper">No profile found for <b>${escapeHtml(u)}</b>.</div>
+      <div class="row" style="margin-top:12px">
+        <a class="btn solid" href="/register?u=${encodeURIComponent(u)}" data-link>Claim this username</a>
+        <a class="btn ghost" href="/" data-link>Back home</a>
+      </div>
+    `));
     return;
   }
 
-  if (path === "/" || path === ""){
-    app.innerHTML = landing();
-    wireGlobalLinks();
-    wireLanding();
-    return;
-  }
+  // apply accent (public page)
+  document.documentElement.style.setProperty("--accent", person.profile.accent || "#f7c400");
 
-  if (path === "/register"){
-    app.innerHTML = registerPage(url.searchParams.get("u"));
-    wireGlobalLinks();
-    wireAuth();
-    return;
-  }
+  const links = (person.profile.links||[]).filter(l=>l.enabled);
+  const linkHtml = links.map(l=>`
+    <a class="pubLink" href="${escapeAttr(l.url)}" target="_blank" rel="noopener">
+      <div class="linkLeft">
+        <div class="linkIcon">${escapeHtml(l.icon||"🔗")}</div>
+        <div>
+          <div class="linkTitle">${escapeHtml(l.title||"Link")}</div>
+          <div class="mini">${escapeHtml(l.url||"")}</div>
+        </div>
+      </div>
+      <span class="pill">Open</span>
+    </a>
+  `).join("") || `<div class="helper">No links added yet.</div>`;
 
-  if (path === "/login"){
-    app.innerHTML = loginPage();
-    wireGlobalLinks();
-    wireAuth();
-    return;
-  }
+  render(`
+    <div class="profileShell">
+      <div class="profileCard">
+        <div class="profileTop">
+          <div class="avatar"></div>
+          <div>
+            <p class="profileName">${escapeHtml(person.profile.displayName || person.username)}</p>
+            <div class="mini">@${escapeHtml(person.username)}</div>
+            <p class="profileBio">${escapeHtml(person.profile.bio || " ")}</p>
+          </div>
+        </div>
+        <div class="profileBody">
+          <div class="profileLinks">${linkHtml}</div>
+          <div style="height:12px"></div>
+          ${ownerLink(person.username)}
+        </div>
+      </div>
+    </div>
+  `);
 
-  // public username page
-  const maybeUser = path.replace(/^\/+/, "");
-  app.innerHTML = publicProfile(maybeUser);
-  wireGlobalLinks();
-  wireLanding();
+  // count view (prototype)
+  person.stats = person.stats || { views:0, clicks:0 };
+  person.stats.views++;
+  saveUser(person);
 }
 
-render();
+function ownerLink(username){
+  const sess = getSession();
+  if(sess?.username !== username) return "";
+  return `
+    <div class="row" style="justify-content:space-between">
+      <div class="helper">Owner tools</div>
+      <a class="btn solid" href="/dashboard?s=profile" data-link>Edit in Dashboard</a>
+    </div>
+  `;
+}
+
+function escapeHtml(s){
+  return (s??"").toString()
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+function escapeAttr(s){ return escapeHtml(s).replaceAll('"',"&quot;"); }
+
+function resetAccent(){
+  document.documentElement.style.setProperty("--accent", "#f7c400");
+}
+
+function router(){
+  updateTopbar();
+
+  // reset accent on non-profile pages
+  if(location.pathname === "/" || location.pathname.startsWith("/dashboard") || location.pathname==="/login" || location.pathname==="/register"){
+    resetAccent();
+  }
+
+  const { name, username } = routeMatch(location.pathname);
+
+  if(name==="/") return landing();
+  if(name==="/register") return registerPage();
+  if(name==="/login") return loginPage();
+  if(name==="/dashboard") return dashboardPage();
+
+  // simple placeholder pages
+  if(name==="/features" || name==="/premium" || name==="/discord"){
+    return render(pageShell(name.slice(1).toUpperCase(), `
+      <div class="helper">Placeholder page. We’ll build this out next.</div>
+      <div class="row" style="margin-top:12px">
+        <a class="btn solid" href="/" data-link>Back home</a>
+      </div>
+    `));
+  }
+
+  // dynamic username route
+  if(name==="/:username") return publicProfile(username);
+
+  // fallback
+  render(pageShell("Not found", `
+    <div class="helper">That route doesn’t exist.</div>
+    <div class="row" style="margin-top:12px">
+      <a class="btn solid" href="/" data-link>Go home</a>
+    </div>
+  `));
+}
+
+router();
