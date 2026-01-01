@@ -1,6 +1,3 @@
-// larped.lol — Phase 1 static prototype (no backend)
-// Routes work on Cloudflare Pages via _redirects -> /index.html 200
-
 const $app = document.getElementById("app");
 const year = document.getElementById("year");
 if (year) year.textContent = new Date().getFullYear();
@@ -10,7 +7,6 @@ const SESSION_KEY = "larped_session_v1";
 
 function safeUsername(raw) {
   const u = (raw || "").trim().toLowerCase();
-  // allow a-z 0-9 _ . - (like many platforms)
   if (!u) return "";
   if (!/^[a-z0-9._-]{2,20}$/.test(u)) return "";
   return u;
@@ -44,8 +40,7 @@ function linkify() {
     a.addEventListener("click", (e) => {
       const href = a.getAttribute("href");
       if (!href) return;
-      // allow normal hash jumps
-      if (href.startsWith("/#")) return;
+      if (href.startsWith("/#")) return; // allow hash scroll
       e.preventDefault();
       navTo(href);
     });
@@ -60,6 +55,7 @@ function pageShell(inner) {
   wireActions();
 }
 
+/* Pages */
 function Landing() {
   return `
     <section class="section center">
@@ -87,7 +83,7 @@ function Landing() {
         <div class="grid">
           ${FeatureCard("🔗", "Links", "Connect all your important links in one place.")}
           ${FeatureCard("🧩", "Templates", "Start fast with premium templates, then customize everything.")}
-          ${FeatureCard("📊", "Analytics", "Built-in privacy-first analytics (Phase 2 backend).")}
+          ${FeatureCard("📊", "Analytics", "Privacy-first analytics (Phase 2 backend).")}
           ${FeatureCard("🧱", "Layouts", "Flexible sections, widgets, and modular blocks (Phase 2).")}
           ${FeatureCard("💬", "Comments", "Optional interactions with safety controls (Phase 2).")}
           ${FeatureCard("🎨", "Appearance", "Glass UI, theme color, gradients, and motion.")}
@@ -100,21 +96,15 @@ function Landing() {
         <div class="card">
           <div class="icon">💎</div>
           <h3>Premium feel, free core</h3>
-          <p>
-            We’ll keep core customization free. Premium can be optional extras later (like advanced analytics),
-            but the main experience stays high-end for everyone.
-          </p>
+          <p>Core customization stays free. Premium can be optional extras later (advanced analytics).</p>
         </div>
       </section>
 
       <section id="discord" class="section">
         <div class="card">
           <div class="icon">🧠</div>
-          <h3>Next: Dashboard + Real Accounts</h3>
-          <p>
-            This Phase 1 build is a working front-end prototype on Pages.
-            Next we’ll add real login, username claiming, and saved profiles using Cloudflare D1 + Pages Functions.
-          </p>
+          <h3>Next: Real accounts + dashboard</h3>
+          <p>This is a Pages prototype. Next we add real auth + saved profiles using Cloudflare D1 + Functions.</p>
         </div>
       </section>
     </section>
@@ -140,9 +130,6 @@ function Register(queryU) {
         <h2>Register</h2>
         <div class="muted">Create your account to claim your username.</div>
 
-        <button class="btn primary full" id="discordStub">Sign up with Discord</button>
-        <div class="hr"></div>
-
         <form class="form" id="regForm">
           <div class="field">
             <div class="label">Username</div>
@@ -160,9 +147,7 @@ function Register(queryU) {
             <input class="input" name="password" type="password" placeholder="Your password" />
           </div>
 
-          <div class="note">
-            CAPTCHA will be added in Phase 2 (backend). For now, this is a prototype.
-          </div>
+          <div class="note">This is Phase 1 (browser-only). Phase 2 adds real secure auth + CAPTCHA.</div>
 
           <button class="btn primary full" type="submit">Register</button>
           <div class="muted" style="margin-top:4px;">
@@ -181,9 +166,6 @@ function Login() {
         <div class="panelTop"><div class="miniDot"></div><div style="font-weight:700">larped.lol</div></div>
         <h2>Sign in</h2>
         <div class="muted">Welcome back. Enter your details.</div>
-
-        <button class="btn primary full" id="discordStub2">Sign in with Discord</button>
-        <div class="hr"></div>
 
         <form class="form" id="loginForm">
           <div class="field">
@@ -233,7 +215,7 @@ function Dashboard() {
     <section class="section">
       <div class="card">
         <h3>Overview</h3>
-        <p class="muted">Logged in as <b>${escapeHtml(s.username)}</b>. Phase 2 will add the real dashboard UI + customization.</p>
+        <p class="muted">Logged in as <b>${escapeHtml(s.username)}</b>.</p>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
           <a class="btn ghost" href="/${encodeURIComponent(s.username)}" data-link>View Profile</a>
           <button class="btn danger" id="logoutBtn">Logout</button>
@@ -250,7 +232,7 @@ function PublicProfile(username) {
       <section class="auth">
         <div class="panel">
           <h2>Invalid username</h2>
-          <div class="muted">Usernames must be 2–20 chars and use a-z, 0-9, . _ -</div>
+          <div class="muted">Use 2–20 chars: a-z 0-9 . _ -</div>
           <a class="btn primary" href="/" data-link>Back home</a>
         </div>
       </section>
@@ -260,7 +242,6 @@ function PublicProfile(username) {
   const users = loadUsers();
   const data = users[u];
 
-  // Default profile if not registered yet (still looks premium)
   const display = data?.displayName || u;
   const bio = data?.bio || "This profile is not set up yet. Claim your username to customize everything.";
   const links = data?.links || [
@@ -286,38 +267,34 @@ function PublicProfile(username) {
       </div>
 
       <div class="hr"></div>
-      <div class="muted">Phase 2 will add full themes, media, widgets, analytics, and verified badges.</div>
+      <div class="muted">Phase 2 adds themes, media, widgets, and analytics.</div>
     </section>
   `;
 }
 
+/* Router */
 function render() {
   const url = new URL(location.href);
   const path = decodeURIComponent(url.pathname);
 
-  // simple router
-  if (path === "/" || path === "") {
-    pageShell(Landing());
-    return;
-  }
-  if (path === "/register") {
-    pageShell(Register(url.searchParams.get("u")));
-    return;
-  }
-  if (path === "/login") {
-    pageShell(Login());
-    return;
-  }
-  if (path === "/dashboard") {
-    pageShell(Dashboard());
+  // Fix: if you go to /profile, don't treat it as a username (confusing)
+  if (path === "/profile") {
+    const s = getSession();
+    if (s?.username) navTo(`/${encodeURIComponent(s.username)}`);
+    else navTo("/login");
     return;
   }
 
-  // /:username
+  if (path === "/" || path === "") { pageShell(Landing()); return; }
+  if (path === "/register") { pageShell(Register(url.searchParams.get("u"))); return; }
+  if (path === "/login") { pageShell(Login()); return; }
+  if (path === "/dashboard") { pageShell(Dashboard()); return; }
+
   const maybeUser = path.replace(/^\/+/, "");
   pageShell(PublicProfile(maybeUser));
 }
 
+/* Actions */
 function wireActions() {
   const claimBtn = document.getElementById("claimBtn");
   const claimInput = document.getElementById("claimInput");
@@ -351,14 +328,12 @@ function wireActions() {
       if (password.length < 6) return alert("Password must be at least 6 characters.");
 
       const users = loadUsers();
-      if (users[username]) return alert("That username is already claimed (in this prototype).");
+      if (users[username]) return alert("That username is already claimed (prototype).");
 
       users[username] = {
         username,
         email,
-        // NOTE: In Phase 1 we DO NOT hash because there’s no backend.
-        // In Phase 2 we will hash on the server with proper auth.
-        password,
+        password, // Phase 1 only (browser). Phase 2 will hash securely on server.
         displayName: username,
         bio: "Edit your bio in the dashboard (Phase 2).",
         links: [
@@ -386,14 +361,11 @@ function wireActions() {
 
       for (const u of Object.keys(users)) {
         const row = users[u];
-        if (row.username === id || row.email === id) {
-          found = row;
-          break;
-        }
+        if (row.username === id || row.email === id) { found = row; break; }
       }
 
-      if (!found) return alert("Account not found (prototype). Try registering first.");
-      if (found.password !== password) return alert("Wrong password (prototype).");
+      if (!found) return alert("Account not found. Register first.");
+      if (found.password !== password) return alert("Wrong password.");
 
       setSession({ username: found.username });
       navTo("/dashboard");
@@ -408,14 +380,7 @@ function wireActions() {
     });
   }
 
-  // Stub buttons
-  const discordStub = document.getElementById("discordStub");
-  if (discordStub) discordStub.addEventListener("click", () => alert("Discord OAuth comes in Phase 2 (backend)."));
-
-  const discordStub2 = document.getElementById("discordStub2");
-  if (discordStub2) discordStub2.addEventListener("click", () => alert("Discord OAuth comes in Phase 2 (backend)."));
-
-  // enable internal links inside rendered profile links
+  // internal links inside profile cards
   document.querySelectorAll('a[data-link]').forEach(a => {
     a.addEventListener("click", (e) => {
       const href = a.getAttribute("href");
