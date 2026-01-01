@@ -3,27 +3,96 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#f7c400" />
-  <title>larped.lol — your digital identity, simplified.</title>
-  <meta name="description" content="larped.lol — premium link-in-bio profiles with a luxury UI." />
+  <meta name="color-scheme" content="dark" />
+  <title>larped.lol — your digital identity, simplified</title>
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
+  <!-- IMPORTANT: absolute path -->
   <link rel="stylesheet" href="/styles.css" />
+
+  <!-- IMPORTANT: absolute path + defer -->
+  <script src="/app.js" defer></script>
 </head>
 <body>
-  <div id="bg">
-    <div class="bg-blob b1"></div>
-    <div class="bg-blob b2"></div>
-    <div class="bg-blob b3"></div>
-    <div class="bg-noise"></div>
-    <div class="bg-vignette"></div>
-  </div>
+  <div class="bg"></div>
+  <div class="noise"></div>
 
-  <div id="app"></div>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <span class="logo-dot"></span>
+      <span class="brand-text">larped.lol</span>
+    </a>
 
-  <script defer src="/app.js"></script>
+    <nav class="navlinks">
+      <a href="#features">Features</a>
+      <a href="#premium">Premium</a>
+      <a href="#discord">Discord</a>
+    </nav>
+
+    <div class="navcta">
+      <a class="btn ghost" href="/login">Login</a>
+      <a class="btn primary" href="/register">Register</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Your digital identity,<br><span class="accent">simplified.</span></h1>
+      <p class="sub">
+        Claim your @, customize your page, and drop your links — fast, clean, and premium.
+      </p>
+
+      <form class="claim" id="claimForm" autocomplete="off">
+        <div class="claimPrefix">larped.lol/</div>
+        <input
+          id="claimUsername"
+          class="claimInput"
+          type="text"
+          placeholder="username"
+          minlength="1"
+          maxlength="20"
+          spellcheck="false"
+        />
+        <button class="btn primary claimBtn" type="submit">Claim</button>
+      </form>
+
+      <div class="hint" id="claimHint">
+        Usernames: a-z, 0-9, underscore, dot, dash. Length: 1–20.
+      </div>
+      <div class="msg" id="claimMsg" aria-live="polite"></div>
+    </section>
+
+    <section class="grid" id="features">
+      <div class="card">
+        <div class="cardIcon">🔗</div>
+        <h3>Links</h3>
+        <p>Connect everything in one place. Clean, fast, and organized.</p>
+      </div>
+      <div class="card">
+        <div class="cardIcon">🎨</div>
+        <h3>Appearance</h3>
+        <p>Glass UI, gradients, motion, and a premium vibe.</p>
+      </div>
+      <div class="card">
+        <div class="cardIcon">📊</div>
+        <h3>Analytics</h3>
+        <p>Privacy-first stats and profile insights.</p>
+      </div>
+      <div class="card">
+        <div class="cardIcon">🧩</div>
+        <h3>Layouts</h3>
+        <p>Modular profile blocks and flexible designs.</p>
+      </div>
+    </section>
+
+    <section class="footer" id="discord">
+      <div class="footerCard">
+        <div>
+          <h3>Join the Discord</h3>
+          <p>Updates, drops, and early features.</p>
+        </div>
+        <a class="btn ghost" href="#" onclick="alert('Add your Discord invite link'); return false;">Open Discord</a>
+      </div>
+    </section>
+  </main>
 </body>
 </html>
