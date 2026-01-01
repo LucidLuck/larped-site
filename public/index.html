@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>larped.lol • your digital identity</title>
+  <link rel="stylesheet" href="/styles.css"/>
+</head>
+<body>
+  <header class="nav">
+    <div class="brand">
+      <span class="brandDot"></span>
+      <span>larped.lol</span>
+      <span class="badge">yellow</span>
+    </div>
+
+    <nav class="navLinks">
+      <a href="#features">Features</a>
+      <a href="#premium">Premium</a>
+      <a href="#discord">Discord</a>
+    </nav>
+
+    <div class="navBtns">
+      <a class="btn" href="/login.html">Login</a>
+      <a class="btn primary" href="/register.html">Register</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1 class="hTitle">Your digital identity,<br/>simplified.</h1>
+      <p class="hSub">
+        Claim your @, customize your page, and drop your links — fast, clean, and premium.
+      </p>
+
+      <div class="claimRow">
+        <div class="pill">larped.lol/</div>
+        <input id="claimUser" class="input" placeholder="username" maxlength="20" autocomplete="off"/>
+        <button id="claimBtn" class="btn primary">Claim</button>
+      </div>
+      <div class="hint" id="claimHint">Usernames: a-z, 0-9, dot, dash, underscore. 1–20 chars.</div>
+    </section>
+
+    <section id="features" class="grid">
+      <div class="tile">
+        <h3>Links</h3><p>Connect all your important links in one place.</p>
+      </div>
+      <div class="tile">
+        <h3>Templates</h3><p>Start with luxury layouts, then customize everything.</p>
+      </div>
+      <div class="tile">
+        <h3>Analytics</h3><p>Privacy-first stats (Phase 2 backend).</p>
+      </div>
+      <div class="tile">
+        <h3>Layouts</h3><p>Flexible sections, widgets, and modular blocks.</p>
+      </div>
+      <div class="tile">
+        <h3>Comments</h3><p>Optional interactions with safety controls.</p>
+      </div>
+      <div class="tile">
+        <h3>Appearance</h3><p>Glass UI, theme color, gradients, and motion.</p>
+      </div>
+      <div class="tile">
+        <h3>Rich Text</h3><p>Beautiful bio formatting and embeds.</p>
+      </div>
+      <div class="tile">
+        <h3>Live Preview</h3><p>Instant preview while editing.</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="/assets/app.js"></script>
+</body>
+</html>
