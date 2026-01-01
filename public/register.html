@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login • larped.lol</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="authShell">
+    <div class="authCard">
+      <h1>Login</h1>
+      <p class="muted">Welcome back.</p>
+
+      <form id="loginForm" class="form">
+        <label>Username</label>
+        <input id="username" autocomplete="username" required />
+        <label>Password</label>
+        <input id="password" type="password" autocomplete="current-password" required />
+        <button class="btn primary" type="submit">Login</button>
+        <p class="muted">No account? <a href="/register">Register</a></p>
+        <p id="msg" class="msg"></p>
+      </form>
+    </div>
+  </main>
+
+  <script type="module" src="/auth.js"></script>
+</body>
+</html>
