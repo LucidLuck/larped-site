@@ -7,11 +7,11 @@
   <title>larped.lol — Your digital identity, simplified.</title>
   <meta name="description" content="Create a premium profile, links, and content in one place — larped.lol" />
 
-  <!-- Inter font (safe + premium) -->
   <link rel="preconnect" href="https://rsms.me/">
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
 
-  <link rel="stylesheet" href="/styles.css" />
+  <!-- cache-bust so you don't get stuck with old CSS -->
+  <link rel="stylesheet" href="/styles.css?v=2" />
 </head>
 <body>
   <div class="bg">
@@ -48,6 +48,7 @@
     </div>
   </footer>
 
-  <script src="/app.js" defer></script>
+  <!-- cache-bust so you don't get stuck with old JS -->
+  <script src="/app.js?v=2" defer></script>
 </body>
 </html>
