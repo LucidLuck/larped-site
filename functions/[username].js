@@ -1,4 +1,4 @@
-import { now } from "./api/_util.js";
+import { now } from "../api/_util.js";
 
 const RESERVED = new Set([
   "login","register","dashboard","api","assets","styles.css","favicon.ico","robots.txt","404.html"
@@ -20,7 +20,7 @@ export async function onRequest(context) {
     .bind(username)
     .first();
 
-  if (!user) return context.next(); // lets /public/404.html handle if you want
+  if (!user) return context.next();
 
   const profile = await context.env.DB
     .prepare("SELECT display_name,bio,occupation,location,avatar_url,banner_url,accent,views FROM profiles WHERE user_id=?")
@@ -32,13 +32,13 @@ export async function onRequest(context) {
     .bind(user.id)
     .all();
 
-  // increment views (simple)
+  // increment views
   await context.env.DB
     .prepare("UPDATE profiles SET views = views + 1, updated_at=? WHERE user_id=?")
     .bind(now(), user.id)
     .run();
 
-  const accent = profile?.accent === "yellow" ? "#ffd24a" : "#ffd24a";
+  const accent = "#ffd24a"; // main larped yellow
 
   const html = `<!doctype html>
 <html>
@@ -54,7 +54,11 @@ export async function onRequest(context) {
   <main class="profileWrap">
     <section class="card profileCard">
       <div class="row">
-        <div class="avatar">${profile?.avatar_url ? `<img src="${profile.avatar_url}" alt="avatar"/>` : `<div class="avatarFallback"></div>`}</div>
+        <div class="avatar">${
+          profile?.avatar_url
+            ? `<img src="${profile.avatar_url}" alt="avatar"/>`
+            : `<div class="avatarFallback"></div>`
+        }</div>
         <div class="who">
           <div class="dn">${escapeHtml(profile?.display_name || user.username)}</div>
           <div class="un">@${user.username}</div>
@@ -81,7 +85,9 @@ export async function onRequest(context) {
 </body>
 </html>`;
 
-  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+  return new Response(html, {
+    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }
+  });
 }
 
 function escapeHtml(s){
