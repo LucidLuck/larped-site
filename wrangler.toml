@@ -6,4 +6,5 @@ pages_build_output_dir = "./public"
 [[d1_databases]]
 binding = "DB"
 database_name = "larped-db"
-database_id = "REPLACE_ME"
+database_id = "001cd5aa-304b-4326-9070-a60953ca187f"
+
