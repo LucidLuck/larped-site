@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Login • larped.lol</title>
+  <link rel="stylesheet" href="/styles.css"/>
+</head>
+<body>
+  <header class="nav">
+    <div class="brand"><span class="brandDot"></span><span>larped.lol</span></div>
+    <div class="navBtns">
+      <a class="btn" href="/">Home</a>
+      <a class="btn primary" href="/register.html">Register</a>
+    </div>
+  </header>
+
+  <main class="authWrap">
+    <section class="authCard">
+      <h2>Login</h2>
+      <small>Use your username or email.</small>
+
+      <div class="field">
+        <label>Username or Email</label>
+        <input id="user" autocomplete="username"/>
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <input id="pass" type="password" autocomplete="current-password"/>
+      </div>
+
+      <div style="margin-top:14px; display:flex; gap:10px;">
+        <button id="go" class="btn primary">Login</button>
+        <a class="btn" href="/register.html">Create account</a>
+      </div>
+
+      <div id="msg" class="err" style="display:none;"></div>
+    </section>
+  </main>
+
+  <script src="/assets/auth.js"></script>
+</body>
+</html>
