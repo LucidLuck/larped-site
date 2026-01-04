@@ -3,247 +3,78 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Tiko • larped.lol</title>
-  <meta name="description" content="Tiko — Discord status + activity" />
+  <title>tiko</title>
+  <meta name="theme-color" content="#070a12" />
   <link rel="stylesheet" href="./style.css" />
 </head>
+
 <body>
-  <div class="bg" aria-hidden="true">
-    <div class="stars"></div>
-    <div class="glow"></div>
-  </div>
+  <!-- Background -->
+  <div class="bg" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <!-- Ambient audio -->
+  <audio id="bgAudio" src="./song.mp3" preload="auto" loop></audio>
 
   <main class="wrap">
-    <section class="card" id="card">
+    <section class="card">
       <header class="top">
-        <div class="avatar" id="avatar" aria-hidden="true"></div>
-        <div class="id">
-          <h1 class="name">Tiko</h1>
-          <div class="tagline">
-            <span class="dot" id="presenceDot"></span>
-            <span id="presenceText">Loading Discord…</span>
-          </div>
+        <div class="pfp">
+          <!-- drop your avatar in /public/avatar.png (or replace the src) -->
+          <img src="./avatar.png" alt="tiko" onerror="this.style.display='none'; this.parentElement.classList.add('noimg')" />
+          <div class="pfpFallback">t</div>
         </div>
+
+        <div class="who">
+          <div class="nameRow">
+            <h1 class="name">tiko</h1>
+            <span class="badge">larped.lol</span>
+          </div>
+          <p class="tagline" id="tagline">discord status loading…</p>
+        </div>
+
+        <button class="audioBtn" id="audioBtn" type="button" aria-label="Play music">
+          <span class="audioDot"></span>
+          <span id="audioText">Play</span>
+        </button>
       </header>
 
-      <div class="chips">
-        <div class="chip" title="Discord username">@<span id="discordUser">—</span></div>
-        <div class="chip" title="Discord ID">ID: <span id="discordId">—</span></div>
-      </div>
+      <div class="icons" id="icons"></div>
 
-      <div class="panel">
-        <div class="panelTitle">Activity</div>
-        <div class="activity" id="activity">
-          <div class="empty">Loading…</div>
+      <div class="panels">
+        <div class="panel" id="discordPanel">
+          <div class="panelTitle">Discord</div>
+          <div class="panelBody">
+            <div class="dRow">
+              <span class="dot" id="statusDot"></span>
+              <div class="dInfo">
+                <div class="dUser">
+                  <span class="dName" id="dName">tiko</span>
+                  <span class="dId" id="dId">1288251829892939798</span>
+                </div>
+                <div class="dSub" id="dSub">Waiting for presence…</div>
+              </div>
+            </div>
+
+            <div class="activity" id="activity" style="display:none;"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panelTitle">Links</div>
+          <div class="panelBody small">
+            Add / remove icons in <code>app.js</code>. Big buttons, clean look, easy.
+          </div>
         </div>
       </div>
-
-      <div class="row">
-        <a class="btn primary" href="https://discord.gg/gut" target="_blank" rel="noreferrer">
-          Join Discord
-        </a>
-        <button class="btn ghost" id="copyBtn" type="button">
-          Copy @
-        </button>
-      </div>
-
-      <footer class="foot">
-        <span class="muted">larped.lol</span>
-        <span class="sep">•</span>
-        <span class="muted">Clean bio page</span>
-      </footer>
     </section>
+
+    <footer class="foot">
+      <span>© <span id="year"></span> tiko</span>
+    </footer>
   </main>
 
-  <script>
-    // ====== CONFIG ======
-    const DISCORD_ID = "YOUR_DISCORD_ID_HERE"; // <-- put your Discord numeric ID
-    const DISCORD_INVITE = "https://discord.gg/gut";
-
-    // Lanyard: public presence API (no token needed)
-    // docs: https://lanyard.rest/
-    const WS_URL = "wss://api.lanyard.rest/socket";
-    const REST_URL = (id) => `https://api.lanyard.rest/v1/users/${id}`;
-
-    const $ = (q) => document.querySelector(q);
-
-    const avatarEl = $("#avatar");
-    const presenceDot = $("#presenceDot");
-    const presenceText = $("#presenceText");
-    const discordUserEl = $("#discordUser");
-    const discordIdEl = $("#discordId");
-    const activityEl = $("#activity");
-    const copyBtn = $("#copyBtn");
-
-    function setPresence(state){
-      // state: online, idle, dnd, offline
-      const map = {
-        online: ["Online", "online"],
-        idle: ["Idle", "idle"],
-        dnd: ["Do Not Disturb", "dnd"],
-        offline: ["Offline", "offline"],
-      };
-      const [label, cls] = map[state] || ["Unknown", "offline"];
-      presenceDot.className = `dot ${cls}`;
-      presenceText.textContent = label;
-    }
-
-    function safeText(v){ return (v ?? "").toString(); }
-
-    function renderActivity(d){
-      // d is Lanyard data object
-      const user = d?.discord_user;
-      const kv = (k, v) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
-
-      // avatar
-      if (user?.id) {
-        const avatarHash = user.avatar;
-        const avatarUrl = avatarHash
-          ? `https://cdn.discordapp.com/avatars/${user.id}/${avatarHash}.png?size=256`
-          : `https://cdn.discordapp.com/embed/avatars/0.png`;
-        avatarEl.style.backgroundImage = `url("${avatarUrl}")`;
-      }
-
-      // username
-      const username = user?.username ? user.username : "unknown";
-      const discrim = user?.discriminator && user.discriminator !== "0" ? `#${user.discriminator}` : "";
-      discordUserEl.textContent = `${username}${discrim}`;
-      discordIdEl.textContent = safeText(user?.id || DISCORD_ID);
-
-      // status
-      setPresence(d?.discord_status || "offline");
-
-      // activities
-      const acts = Array.isArray(d?.activities) ? d.activities : [];
-      const filtered = acts.filter(a => a && a.type !== 4); // keep custom status separate
-      const custom = acts.find(a => a && a.type === 4); // Custom Status
-
-      const blocks = [];
-
-      if (custom?.state) {
-        blocks.push(`
-          <div class="act">
-            <div class="actTitle">Status</div>
-            <div class="actBody">${escapeHtml(custom.state)}</div>
-          </div>
-        `);
-      }
-
-      // Spotify (Lanyard gives spotify object when listening)
-      if (d?.spotify) {
-        const s = d.spotify;
-        blocks.push(`
-          <div class="act">
-            <div class="actTitle">Listening</div>
-            <div class="actBody">
-              <div class="big">${escapeHtml(s.song)}</div>
-              <div class="small">${escapeHtml(s.artist)} • ${escapeHtml(s.album)}</div>
-            </div>
-          </div>
-        `);
-      }
-
-      // Other activity (game/app)
-      const top = filtered.find(a => a.name && a.name !== "Spotify");
-      if (top) {
-        const details = top.details ? `<div class="small">${escapeHtml(top.details)}</div>` : "";
-        const state = top.state ? `<div class="small">${escapeHtml(top.state)}</div>` : "";
-        blocks.push(`
-          <div class="act">
-            <div class="actTitle">Activity</div>
-            <div class="actBody">
-              <div class="big">${escapeHtml(top.name)}</div>
-              ${details}
-              ${state}
-            </div>
-          </div>
-        `);
-      }
-
-      if (!blocks.length) {
-        blocks.push(`<div class="empty">No activity right now.</div>`);
-      }
-
-      activityEl.innerHTML = blocks.join("");
-    }
-
-    function escapeHtml(s){
-      return safeText(s).replace(/[&<>"']/g, (m)=>({
-        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-      }[m]));
-    }
-
-    async function loadOnce(){
-      if (!DISCORD_ID || DISCORD_ID.includes("YOUR_")) {
-        presenceText.textContent = "Set your Discord ID in index.html";
-        setPresence("offline");
-        activityEl.innerHTML = `<div class="empty">Edit <b>DISCORD_ID</b> in index.html.</div>`;
-        return;
-      }
-
-      try {
-        const r = await fetch(REST_URL(DISCORD_ID), { cache: "no-store" });
-        const j = await r.json();
-        if (!j?.success) throw new Error("Lanyard REST failed");
-        renderActivity(j.data);
-      } catch (e) {
-        presenceText.textContent = "Couldn’t load Discord";
-        setPresence("offline");
-        activityEl.innerHTML = `<div class="empty">Discord presence failed to load.</div>`;
-      }
-    }
-
-    function connectWS(){
-      if (!DISCORD_ID || DISCORD_ID.includes("YOUR_")) return;
-
-      const ws = new WebSocket(WS_URL);
-
-      ws.addEventListener("open", () => {
-        ws.send(JSON.stringify({
-          op: 2,
-          d: { subscribe_to_id: DISCORD_ID }
-        }));
-      });
-
-      ws.addEventListener("message", (ev) => {
-        try {
-          const msg = JSON.parse(ev.data);
-          // op 0 => event
-          if (msg.op === 0 && msg.t === "PRESENCE_UPDATE") {
-            renderActivity(msg.d);
-          }
-          // heartbeat interval
-          if (msg.op === 1 && msg.d?.heartbeat_interval) {
-            setInterval(() => {
-              if (ws.readyState === 1) ws.send(JSON.stringify({ op: 3 }));
-            }, msg.d.heartbeat_interval);
-          }
-        } catch {}
-      });
-
-      ws.addEventListener("close", () => {
-        setTimeout(connectWS, 1500);
-      });
-    }
-
-    copyBtn.addEventListener("click", async () => {
-      const handle = "@" + safeText(discordUserEl.textContent || "");
-      try {
-        await navigator.clipboard.writeText(handle);
-        copyBtn.textContent = "Copied";
-        setTimeout(()=> copyBtn.textContent = "Copy @", 1200);
-      } catch {
-        copyBtn.textContent = "Copy failed";
-        setTimeout(()=> copyBtn.textContent = "Copy @", 1200);
-      }
-    });
-
-    // init
-    loadOnce();
-    connectWS();
-
-    // set invite link everywhere if needed later
-    // (kept here for future)
-  </script>
+  <script src="./app.js"></script>
 </body>
 </html>
