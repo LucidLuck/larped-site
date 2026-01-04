@@ -1,8 +1,0 @@
-# Keep real pages working
-/login       /login.html      200
-/register    /register.html   200
-/dashboard   /dashboard.html  200
-
-# Anything else routes to profile.html (profile.js decides what username is)
-# This is how we get larped.lol/<username>
-/*           /profile.html    200
