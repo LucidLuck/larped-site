@@ -112,7 +112,7 @@ async function verifyJWT(secret: string, token: string) {
 }
 
 // password hashing (PBKDF2)
-async function pbkdf2Hash(password: string, saltB64: string, iterations = 210_000) {
+async function pbkdf2Hash(password: string, saltB64: string, iterations = 90_000) {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
   const salt = fromB64url(saltB64);
@@ -440,3 +440,4 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     return json({ ok: false, error: "Server error", detail: String(e?.message || e) }, 500);
   }
 };
+
