@@ -1,78 +1,115 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>tiko</title>
-  <meta name="theme-color" content="#070a12" />
-  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="./style.css"/>
+  <meta name="theme-color" content="#000000"/>
 </head>
 
 <body>
-  <!-- Background -->
-  <div class="bg" aria-hidden="true"></div>
-  <div class="vignette" aria-hidden="true"></div>
-  <div class="grain" aria-hidden="true"></div>
-
-  <!-- Ambient audio -->
-  <audio id="bgAudio" src="./song.mp3" preload="auto" loop></audio>
+  <div class="bg"></div>
+  <div class="shade"></div>
 
   <main class="wrap">
-    <section class="card">
-      <header class="top">
+    <!-- TOP CARD -->
+    <section class="card card-top">
+      <div class="cardTopRow">
         <div class="pfp">
-          <!-- drop your avatar in /public/avatar.png (or replace the src) -->
-          <img src="./avatar.png" alt="tiko" onerror="this.style.display='none'; this.parentElement.classList.add('noimg')" />
+          <img src="./avatar.png" alt="tiko" onerror="this.remove(); document.querySelector('.pfp').classList.add('noimg')" />
           <div class="pfpFallback">t</div>
         </div>
 
-        <div class="who">
-          <div class="nameRow">
-            <h1 class="name">tiko</h1>
-            <span class="badge">larped.lol</span>
+        <div class="topRight">
+          <div class="stat">
+            <span class="statIcon">👁</span>
+            <span id="views">55,803</span>
           </div>
-          <p class="tagline" id="tagline">discord status loading…</p>
-        </div>
-
-        <button class="audioBtn" id="audioBtn" type="button" aria-label="Play music">
-          <span class="audioDot"></span>
-          <span id="audioText">Play</span>
-        </button>
-      </header>
-
-      <div class="icons" id="icons"></div>
-
-      <div class="panels">
-        <div class="panel" id="discordPanel">
-          <div class="panelTitle">Discord</div>
-          <div class="panelBody">
-            <div class="dRow">
-              <span class="dot" id="statusDot"></span>
-              <div class="dInfo">
-                <div class="dUser">
-                  <span class="dName" id="dName">tiko</span>
-                  <span class="dId" id="dId">1288251829892939798</span>
-                </div>
-                <div class="dSub" id="dSub">Waiting for presence…</div>
-              </div>
-            </div>
-
-            <div class="activity" id="activity" style="display:none;"></div>
+          <div class="stat">
+            <span class="statIcon">📍</span>
+            <span>larped.lol</span>
           </div>
         </div>
+      </div>
 
-        <div class="panel">
-          <div class="panelTitle">Links</div>
-          <div class="panelBody small">
-            Add / remove icons in <code>app.js</code>. Big buttons, clean look, easy.
+      <div class="identity">
+        <div class="nameRow">
+          <div class="name">tiko</div>
+          <div class="miniBadges" aria-hidden="true">
+            <span class="mini">✦</span><span class="mini">✦</span><span class="mini">✦</span><span class="mini">✦</span>
           </div>
+        </div>
+        <div class="sub" id="statusLine">loading status…</div>
+      </div>
+
+      <div class="iconRow" id="iconRow"></div>
+    </section>
+
+    <!-- DISCORD PRESENCE CARD -->
+    <section class="card card-discord">
+      <div class="dcLeft">
+        <div class="dcLogo">
+          <div class="dcMark">◌</div>
+        </div>
+      </div>
+
+      <div class="dcBody">
+        <div class="dcTop">
+          <div class="dcUser">
+            <span class="dcHandle" id="dcHandle">tiko</span>
+            <span class="dcTag" id="dcTag">@tiko</span>
+          </div>
+          <div class="dcPill" id="dcPill">OFFLINE</div>
+        </div>
+
+        <div class="dcLine" id="dcLine">Waiting for presence…</div>
+
+        <div class="dcNow" id="dcNow" style="display:none;">
+          <div class="dcArt"><img id="dcArt" alt=""/></div>
+          <div class="dcNowText">
+            <div class="dcNowTitle" id="dcNowTitle"></div>
+            <div class="dcNowMeta" id="dcNowMeta"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dcRight">
+        <div class="dcAvatar">
+          <img id="dcAvatar" alt="" />
         </div>
       </div>
     </section>
 
-    <footer class="foot">
-      <span>© <span id="year"></span> tiko</span>
-    </footer>
+    <!-- MUSIC PLAYER CARD -->
+    <section class="card card-music">
+      <div class="mArt">
+        <img id="mCover" src="./avatar.png" alt="" onerror="this.style.display='none'"/>
+      </div>
+
+      <div class="mBody">
+        <div class="mTitle" id="mTitle">your song</div>
+        <div class="mSub" id="mSub">tiko</div>
+
+        <div class="bar">
+          <div class="barFill" id="barFill"></div>
+        </div>
+
+        <div class="mRow">
+          <div class="time">
+            <span id="tNow">0:00</span>
+            <span class="sep">/</span>
+            <span id="tDur">0:00</span>
+          </div>
+
+          <div class="controls">
+            <button class="btn" id="playBtn" type="button" aria-label="Play/Pause">⏵</button>
+          </div>
+        </div>
+      </div>
+
+      <audio id="audio" src="./song.mp3" preload="auto"></audio>
+    </section>
   </main>
 
   <script src="./app.js"></script>
