@@ -1,0 +1,56 @@
+.authWrap{
+  min-height: calc(100vh - 110px);
+  display:grid;
+  place-items:center;
+  padding: 34px 0 60px;
+}
+
+.authCard{
+  width: min(460px, 92vw);
+  padding: 22px;
+}
+.authTitle{
+  font-size: 22px;
+  font-weight: 900;
+  margin: 0 0 6px;
+}
+.field{
+  margin-top: 12px;
+}
+.label{
+  font-size: 13px;
+  color: rgba(234,240,255,.75);
+  margin-bottom: 8px;
+}
+.input{
+  width:100%;
+  padding: 13px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(0,0,0,.25);
+  color: var(--text);
+  outline:none;
+}
+.input:focus{
+  border-color: rgba(11,92,255,.45);
+  box-shadow: 0 0 0 4px rgba(11,92,255,.14);
+}
+
+.err{
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,86,86,.25);
+  background: rgba(255,86,86,.08);
+  color: rgba(255,210,210,.92);
+  display:none;
+}
+.ok{
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(120,255,170,.22);
+  background: rgba(120,255,170,.08);
+  color: rgba(220,255,235,.92);
+  display:none;
+}
