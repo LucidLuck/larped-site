@@ -1,38 +1,37 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>larped.lol</title>
-  <link rel="stylesheet" href="/styles/base.css" />
-  <link rel="stylesheet" href="/styles/profile.css" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Profile • larped.lol</title>
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <div id="bg" class="profileBg"></div>
+  <div class="bg">
+    <div class="stars"></div>
+    <div class="glow"></div>
+  </div>
 
-  <div class="centerWrap">
-    <div id="card" class="profileCard">
-      <div class="headerRow">
-        <div class="avatar" id="av"></div>
-        <div>
-          <div class="name" id="name">—</div>
-          <div class="username" id="user">@—</div>
+  <main class="center">
+    <div id="card" class="profileCard glass">
+      <div class="pfTop">
+        <img id="avatar" class="avatar" alt="" />
+        <div class="pfNames">
+          <div id="display" class="pfDisplay">loading…</div>
+          <div id="handle" class="pfHandle">@</div>
         </div>
       </div>
 
-      <div class="bio" id="bio"></div>
+      <div id="bio" class="pfBio muted"></div>
 
-      <div class="linkGrid" id="links"></div>
+      <div id="links" class="pfLinks"></div>
 
-      <div id="bad" class="bad"></div>
-
-      <div style="margin-top:16px; display:flex; justify-content:space-between; align-items:center;">
-        <a class="pill small" href="/" style="border-color: rgba(255,255,255,.10);">larped.lol</a>
-        <a class="pill small" href="/dashboard">Dashboard</a>
+      <div class="pfFooter">
+        <span class="muted2">larped.lol</span>
       </div>
     </div>
-  </div>
+  </main>
 
-  <script type="module" src="/js/profile.js"></script>
+  <script src="/profile.js"></script>
 </body>
 </html>
