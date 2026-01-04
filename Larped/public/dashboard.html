@@ -1,0 +1,179 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard — larped.lol</title>
+  <link rel="stylesheet" href="/styles/base.css" />
+  <link rel="stylesheet" href="/styles/dashboard.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="container">
+      <div class="nav glass">
+        <a class="brand" href="/"><div class="logo"></div><div>larped.lol</div></a>
+        <div class="navlinks">
+          <a id="myPage" href="/">My Page</a>
+          <a class="btn primary" href="/dashboard">Dashboard</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container shell">
+    <aside class="sidebar glass">
+      <div class="sideTitle">Welcome back, <span id="whoUser"></span></div>
+      <div class="sideNav">
+        <button class="btn tabBtn primary" data-tab="Overview">Account</button>
+        <button class="btn tabBtn" data-tab="Customize">Customize</button>
+        <button class="btn tabBtn" data-tab="Links">Links</button>
+      </div>
+
+      <div class="sideFooter">
+        <div class="pill small">Public URL: <span class="kbd">/</span><span id="statUser" class="kbd"></span></div>
+        <button id="btnLogout" class="btn">Logout</button>
+      </div>
+    </aside>
+
+    <section class="main glass">
+      <div class="tabs">
+        <span class="pill small">Dark blue theme • glass UI • real DB</span>
+      </div>
+
+      <div class="hr"></div>
+
+      <!-- Overview -->
+      <div class="tabPanel" data-tab="Overview">
+        <div class="gridCards">
+          <div class="cardSm">
+            <div class="k">Profile Views (7d)</div>
+            <div class="v" id="statViews">—</div>
+          </div>
+          <div class="cardSm">
+            <div class="k">Desktop</div>
+            <div class="v" id="statDesktop">—</div>
+          </div>
+          <div class="cardSm">
+            <div class="k">Mobile</div>
+            <div class="v" id="statMobile">—</div>
+          </div>
+          <div class="cardSm">
+            <div class="k">Tablet</div>
+            <div class="v" id="statTablet">—</div>
+          </div>
+        </div>
+
+        <div class="panel glass">
+          <div style="font-weight:900; font-size:16px;">Quick Actions</div>
+          <div class="small" style="margin-top:6px;">Save profile changes, then open your page and refresh.</div>
+        </div>
+      </div>
+
+      <!-- Customize -->
+      <div class="tabPanel" data-tab="Customize" style="display:none;">
+        <div class="panel glass">
+          <div style="font-weight:900; font-size:16px;">Profile</div>
+          <div class="small" style="margin-top:6px;">Set your look. This directly controls your public page.</div>
+
+          <div class="row" style="margin-top:12px;">
+            <div>
+              <div class="label">Display Name</div>
+              <input id="display_name" class="input" placeholder="Display name" />
+            </div>
+            <div>
+              <div class="label">Avatar URL (https://...)</div>
+              <input id="avatar_url" class="input" placeholder="https://..." />
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="label">Background URL (https://...)</div>
+            <input id="background_url" class="input" placeholder="https://..." />
+          </div>
+
+          <div class="field">
+            <div class="label">Bio</div>
+            <textarea id="bio" class="input" rows="4" placeholder="Say something clean."></textarea>
+          </div>
+
+          <div class="row" style="margin-top:12px;">
+            <div>
+              <div class="label">Accent Color</div>
+              <input id="accent_color" class="input" placeholder="#0b5cff" />
+            </div>
+            <div>
+              <div class="label">Text Color</div>
+              <input id="text_color" class="input" placeholder="#eaf0ff" />
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:12px;">
+            <div>
+              <div class="label">Primary Color</div>
+              <input id="primary_color" class="input" placeholder="#0b1b3a" />
+            </div>
+            <div>
+              <div class="label">Secondary Color</div>
+              <input id="secondary_color" class="input" placeholder="#071126" />
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:12px;">
+            <div>
+              <div class="label">Card Opacity (0.15 - 0.95)</div>
+              <input id="card_opacity" class="input" placeholder="0.78" />
+            </div>
+            <div>
+              <div class="label">Card Blur (0 - 60)</div>
+              <input id="card_blur_px" class="input" placeholder="18" />
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:12px;">
+            <label class="toggle">
+              <input id="fx_snow" type="checkbox" checked />
+              <span class="small">Snow FX (coming soon for profile)</span>
+            </label>
+            <label class="toggle">
+              <input id="fx_parallax" type="checkbox" checked />
+              <span class="small">Parallax card motion</span>
+            </label>
+          </div>
+
+          <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+            <button id="btnSaveProfile" class="btn primary">Save</button>
+            <a class="btn" id="myPage2" href="/" onclick="setTimeout(()=>location.reload(),250)">Open My Page</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Links -->
+      <div class="tabPanel" data-tab="Links" style="display:none;">
+        <div class="panel glass">
+          <div style="font-weight:900; font-size:16px;">Links</div>
+          <div class="small" style="margin-top:6px;">Add, reorder, toggle, delete. Your page updates instantly.</div>
+
+          <div class="row" style="margin-top:12px;">
+            <div>
+              <div class="label">New Link Label</div>
+              <input id="new_label" class="input" placeholder="Instagram" />
+            </div>
+            <div>
+              <div class="label">New Link URL</div>
+              <input id="new_url" class="input" placeholder="https://instagram.com/..." />
+            </div>
+          </div>
+
+          <div style="margin-top:12px;">
+            <button id="btnAddLink" class="btn primary">Add Link</button>
+          </div>
+
+          <div id="linksList" class="linksList"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/js/dashboard.js"></script>
+</body>
+</html>
